@@ -1,0 +1,13 @@
+THIS SOFTWARE RUNS UNDER APPDAEMON
+
+INSTALL THAT SOFTWARE FIRST< THEN CONTINUE HERE
+
+    > sudo su
+    > cd /root
+    > git clone https://github.com/ToolChainGang/AppDaemon.git
+
+=======================================
+
+Step 01: Replace the rc.local with the one in this 
+
+Copy rc.local.SAMPLE

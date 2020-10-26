@@ -1,0 +1,256 @@
+#!/usr/bin/perl
+#
+########################################################################################################################
+########################################################################################################################
+##
+##      Copyright (C) 2010 Rajstennaj Barrabas, Milford, NH 03055
+##      All Rights Reserved under the MIT license as outlined below.
+##
+##  FILE
+##
+##      GPIOServer
+##
+##  DESCRIPTION
+##
+##      Server for RasPi "relay" hat using GPIOs
+##
+##      Accept commands from a web socket and turn gpios on/off/toggle
+##
+##  USAGE
+##
+##      GPIOServer [-v]
+##
+##      where:      -v      Verbose: print out things as they happen
+##
+########################################################################################################################
+########################################################################################################################
+##
+##  MIT LICENSE
+##
+##  Permission is hereby granted, free of charge, to any person obtaining a copy of
+##    this software and associated documentation files (the "Software"), to deal in
+##    the Software without restriction, including without limitation the rights to
+##    use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+##    of the Software, and to permit persons to whom the Software is furnished to do
+##    so, subject to the following conditions:
+##
+##  The above copyright notice and this permission notice shall be included in
+##    all copies or substantial portions of the Software.
+##
+##  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+##    INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+##    PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+##    HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+##    OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+##    SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+##
+########################################################################################################################
+########################################################################################################################
+
+use strict;
+use warnings;
+use Carp;
+
+use RPi::Pin;
+use RPi::Const qw(:all);
+
+use Time::HiRes qw(usleep);
+
+use JSON;
+
+use lib "/home/pi/GPIOServer/lib";
+
+use Site::WSServer;
+use Site::Log;
+
+our $VERSION = 'GPIOServer2020-10-20';
+
+########################################################################################################################
+########################################################################################################################
+##
+## Data declarations
+##
+########################################################################################################################
+########################################################################################################################
+
+#
+# If your application needs more or fewer GPIOs, or needs to change the GPIO locations for some reason,
+#   such as that you're using your own custom hardware, it *should* suffice to simply edit the GPIOs
+#   array below.
+#
+# It might even be useful to fill this array from command line parameters.
+#
+our $GPIOs       = [ 17, 18, 22 ];
+our $SERVER_PORT = 2021;
+
+our $Server;
+our $GPIOCtls = {};        # ControlStructs for GPIOs
+
+########################################################################################################################
+########################################################################################################################
+##
+## GPIO server
+##
+########################################################################################################################
+########################################################################################################################
+
+#
+# Process command line args.
+#
+#     -v (verbose) means "print out extra stuff"
+#
+my $Verbose = 0;
+
+$Verbose = 1
+    if defined $ARGV[0] and $ARGV[0] eq "-v";
+
+########################################################################################################################
+
+InitLog("GPIOServer",$Verbose);
+
+LogNotice("GPIO Server started");
+
+########################################################################################################################
+#
+# Setup GPIO pins outputs and turned off.
+#
+foreach my $GPIO (@{$GPIOs}) {
+    my $Switch = RPi::Pin->new($GPIO);
+
+    $LED->write(LOW);
+    $Switch->mode(OUTPUT);
+    $LED->write(LOW);
+
+    $GPIOCtls->{$GPIO} = $Switch;
+    }
+
+########################################################################################################################
+#
+# Setup a web socket and listen for connections.
+#
+
+Site::WSServer::InitWSServer($SERVER_PORT,[],\&WebRequest,\&ConnectionRequest)->start;
+
+exit(1);
+
+########################################################################################################################
+########################################################################################################################
+##
+## ConnectionRequest - Process incoming connection requests
+##
+## Inputs:      Connection
+##              Server
+##
+## Outputs:     TRUE  if should accept this request
+##              FALSE if should reject this request
+##
+sub ConnectionRequest {
+
+    return 1;
+    }
+
+
+########################################################################################################################
+########################################################################################################################
+##
+## WebRequest - Process incoming web page requests
+##
+## Inputs:      JSON encoded struct of request
+##              Connection
+##              Server
+##
+## Outputs:     None
+##
+sub WebRequest {
+    my $JSONText = shift // "";
+    my $Conn     = shift;
+    my $Server   = shift;
+    
+    #
+    # Lots of error checking for web requests.
+    #
+    return LogError("WebCommand: No Web request")
+        unless length $JSONText;
+
+    my $Request = eval{decode_json $JSONText};              # Catches/avoids Croak() in lib function
+
+    return LogError("WebCommand: Bad JSON Web request: ($JSONText)")
+        unless defined $Request && (ref $Request) eq "HASH";
+
+    $Request->{Type} //= "";
+        
+    return LogError("WebRequest: No request type: ($JSONText)")
+        unless length $Request->{Type};
+
+    #
+    # GetGPIO(GPIO) - Return GPIO state (=> ["on", "off])
+    #
+    if( $Request->{Type} eq "GetGPIO" ) {
+        my $GPIO = $Request->{Arg1};
+        LogDebug("WebCommand: GetGPIO($GPIO)");
+
+        if( defined $GPIOCtls->{$GPIO} ) {
+            $Request->{State} =  $RelayCtls->{$RelayGPIO}{$Switch}->read() ? "on" : "off";
+            $Request->{Error} = "No error.";
+            }
+        else {
+            $Request->{Error} = "Not a controlled GPIO: $GPIO.";
+            }
+        }
+
+    #
+    # SetGPIO(GPIO,State) - Set the output state of the relay (["on", "off])
+    #
+    # Note: Literal "on" (case sensitive) will turn the relay on
+    #       Any other argument, including NO argument, will turn the relay off
+    #
+    elsif( $Request->{Type} eq "SetGPIO" ) {
+        my $GPIO  = $Request->{Arg1};
+        my $State = $Request->{Arg2};
+        LogDebug("WebCommand: SetGPIO($GPIO,$State)");
+
+        $State = $State eq "on" ? 1 : 0;
+
+        if( defined $GPIOCtls->{$GPIO} ) {
+            $GPIOCtls->{$GPIO}{$Switch}->write($State);
+            $Request->{Error} = "No error.";
+            }
+        else {
+            $Request->{Error} = "Not a controlled GPIO: $GPIO.";
+            }
+        }
+
+    #
+    # Toggle(GPIO,Time) - Toggle the specified GPIO
+    #
+    elsif( $Request->{Type} eq "ToggleGPIO" ) {
+        my $GPIO = $Request->{Arg1};
+        my $Time = $Request->{Arg2};
+        LogDebug("WebCommand: ToggleGPIO($GPIO,$Time)");
+
+        if( defined $GPIOCtls->{$GPIO} ) {
+            my $State = $RelayCtls->{$RelayGPIO}{$Switch}->read();
+
+            $GPIOCtls->{$GPIO}{$Switch}->write(1 - $State);
+            usleep($Time*1000);
+            $GPIOCtls->{$GPIO}{$Switch}->write($State);
+
+            $Request->{Error} = "No error.";
+            }
+        else {
+            $Request->{Error} = "Not a controlled GPIO: $GPIO.";
+            }
+        }
+
+    #
+    # Unknown request type: Return error to caller
+    #
+    else {
+        LogError("WebCommand: Unknown request type ($Request->{Type})");
+        }
+
+    #
+    # Pack up the error message and return the struct to the caller
+    #
+    SendResponse($Conn,$Request);
+    }
