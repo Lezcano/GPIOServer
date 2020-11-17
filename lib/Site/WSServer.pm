@@ -66,9 +66,7 @@ use Carp;
 use Net::WebSocket::Server;
 use JSON::PP;
 
-use lib "/home/pi/GPIOServer/lib";
-
-use Site::Log;
+use Site::Message;
 
 our @EXPORT  = qw(&InitWSServer
                   &GetServer
@@ -111,7 +109,7 @@ sub InitWSServer {
         on_connect => sub {
             my $Server = shift;
             my $Conn   = shift;
-            LogNotice("Connection " . (scalar ($Server->connections())) . " from " . $Conn->ip() . ":" . $Conn->port());
+            Message("Connection " . (scalar ($Server->connections())) . " from " . $Conn->ip() . ":" . $Conn->port());
 
             $Conn->disconnect(1008, "Denied by server")
                 unless &$ConnectRequest($Conn,$Server);
@@ -133,7 +131,7 @@ sub InitWSServer {
                 #
                 disconnect => sub {
                     my ($Conn, $Code, $Reason) = @_;
-                    LogNotice("Disconnect from " . $Conn->ip());
+                    Message("Disconnect from " . $Conn->ip());
                     },
                 );
             },
@@ -188,7 +186,7 @@ sub SendResponse {
 
     my $JSONText = eval{JSON::PP->new->pretty->encode($Response)};          # Catches/avoids Croak() in lib function
 
-    return LogError("WSServer: Bad JSON encode request: ($Response->{Type})")
+    return Message("WSServer: Bad JSON encode request: ($Response->{Type})")
         unless defined $JSONText && length $JSONText;
 
     $Conn->send_utf8($JSONText);

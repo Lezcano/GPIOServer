@@ -1,4 +1,4 @@
-#!/bin/sh -e
+#!/bin/bash
 #
 ########################################################################################################################
 ########################################################################################################################
@@ -7,16 +7,20 @@
 ##      All Rights Reserved under the MIT license as outlined below.
 ##
 ##  FILE
-##
-##      rc.local.SAMPLE
+##      05-UpgradeInstall.sh
 ##
 ##  DESCRIPTION
-##
-##      Sample system startup script (rc.local) for RasPi AppDaemon executing GPIOServer
+##      Do all the system (ie: non-perl) upgrades and installs needed for the AppDaemon
 ##
 ##  USAGE
+##      05-UpgradeInstall.sh
 ##
-##      None. (Executed by system at boot)
+##  NOTES
+##      Wifi access can be intermittant, causing some installs to fail. This will leave the system
+##        in a *valid* state, with some packages downloaded but not installed.
+##
+##      The recommended procedure is to run this script over and over until the output consists  
+##        exclusively of "already the newest version" messages and the like.
 ##
 ########################################################################################################################
 ########################################################################################################################
@@ -43,8 +47,21 @@
 ########################################################################################################################
 ########################################################################################################################
 
-#set -n    # For debugging
+PATH="$PATH:$HOME/GPIOServer/bin"
 
+########################################################################################################################
+########################################################################################################################
+#
+# Ensure we're being run as root
+#
+if [ "$EUID" -ne 0 ]; then
+    echo
+    echo "Must be run as root" 
+    echo
+    exit 1
+    fi
+
+########################################################################################################################
 ########################################################################################################################
 #
 # Ensure that the disk has been expanded
@@ -66,54 +83,49 @@ Unused=$(($DiskSize-$Part1Size-$Part2Size))
 #
 if [ "$Unused" -gt 500000000 ]; then
     echo "============>Disk is not expanded, automatically expanding with reboot..."
-    echo "\n"
+    echo
     raspi-config --expand-rootfs
     reboot
+    exit
     fi
 
+########################################################################################################################
+########################################################################################################################
+#
+# Upgrade linux installation
+#
+echo "========================="
+echo "Upgrading linux"
+
+apt-get update
+apt-get -y upgrade
+
+echo "Done."
+echo
+
+########################################################################################################################
+########################################################################################################################
+#
+# Packages
+#
+echo "===================================="
+echo "Installing packages"
+
+#
+# Upgrade Wiring Pi for Pi V4
+#
+cd /tmp
+wget https://project-downloads.drogon.net/wiringpi-latest.deb
+sudo dpkg -i wiringpi-latest.deb
+
+echo "Done."
+echo
 
 ########################################################################################################################
 #
-# Message - Show message in boot screen
+# All done - Tell the user to reboot
 #
-# Inputs:   $Fail       If message indicates a failure, (==1) print in Red, else (==0) print in Green
-#           $Msg        Message to print
-#
-# Outputs:  None.
-#
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-NC='\033[0m'            # No Color
-
-Message() {
-    if [ $1 -gt 0 ]; then
-        echo "[${RED}FAILED${NC}] $2"
-    else
-        echo "[${GREEN}  OK  ${NC}] $2"
-    fi
-    }
-
-########################################################################################################################
-#
-# Print the IP address
-#
-IP=$(hostname -I) || true
-if [ "$IP" ]; then
-    Message 0 "======> My IP address is $IP"
-fi
-
-########################################################################################################################
-#
-# Start the AppDaemon
-#
-set +e
-
-ConfigGPIO=4;       # Config switch WPi07, Connector pin  7, GPIO (command) BCM 04
-LEDGPIO=19;         # Config LED    WPi24, Connector pin 35, GPIO (command) BCM 19
-
-#nohup /root/AppDaemon/bin/AppDaemon   --config-gpio=$ConfigGPIO --led-gpio=$LEDGPIO --user=pi /home/pi/GPIOServer/bin/GPIOServer &
-nohup /root/AppDaemon/bin/AppDaemon -v --config-gpio=$ConfigGPIO --led-gpio=$LEDGPIO --user=pi /home/pi/GPIOServer/bin/GPIOServer &
-
-set -e
-
-exit 0
+echo "========================="
+echo
+echo "Done with installation, reboot for changes to take effect."
+echo
