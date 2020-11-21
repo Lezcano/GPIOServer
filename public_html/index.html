@@ -1,0 +1,43 @@
+<!DOCTYPE html><html style="cursor: default;">
+
+<head manifest=NoCache.appcache>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <meta name="HandheldFriendly"   content="true" />
+  <title>GPIO Control</title>
+  <link   type="text/css"         href="GPIOServer.css" rel="stylesheet">
+  <script type="text/javascript"  src="GPIOServer.js"></script>
+  <script type="text/javascript">
+    function PageInit() {}
+    </script>
+    </head>
+
+<body>
+
+<div id="ConnectingPage" style="display: block;" class="PageDiv">
+    <h1>Connecting...</h1>
+    </div>
+
+<div id="ControlPage" class="PageDiv">
+    <table class="TOCColumns" summary="GPIO Control">
+        <tr><td style="width: 10%">&nbsp;</td><td><h1>GPIO Control for: <span class="SysName"></span></h1></td></tr>
+         </table>
+
+    <table class="GPIOCColumns" summary="GPIO Control">
+        <tr><td style="width: 20%"></td><td style="width: 60%">
+        <table id="GPIOTable">
+
+            </table>
+        </td></tr></table>
+    </div>
+
+<div id="ConfigPage" class="PageDiv">
+    <table class="TOCColumns" summary="System Configuration">
+        <tr><td style="width: 10%">&nbsp;</td><td><h1>Configure system: <span class="SysName"></span></h1></td></tr>
+         </table>
+    <table class="TOCColumns" summary="System Configuration">
+        <tr><td style="width: 20%"></td><td style="width: 60%">
+        <table id="GPIOCTable">
+            </table>
+        </td></tr></table>
+    </div>
+</html>

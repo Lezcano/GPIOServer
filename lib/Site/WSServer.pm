@@ -66,7 +66,7 @@ use Carp;
 use Net::WebSocket::Server;
 use JSON::PP;
 
-use Site::Message;
+use Site::Process;
 
 our @EXPORT  = qw(&InitWSServer
                   &GetServer

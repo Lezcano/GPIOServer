@@ -66,6 +66,7 @@ use File::Slurp qw(read_file);
 
 use lib "$ENV{HOME}/GPIOServer/lib";
 
+use Site::Process;
 use Site::WSServer;
 use Site::ParseData;
 
@@ -81,6 +82,7 @@ our $SERVER_PORT = 2021;
 
 our $Server;
 our $GPIOConfig;
+our $SysName;
 
 #  #
 #  # Comment
@@ -96,17 +98,17 @@ our $GPIOConfig;
 #
 our $GPIOConfigFile = "$ENV{HOME}/GPIOServer/etc/GPIO.conf";
 our $GPIOMatches = [
-    {                     RegEx  => qr/^\s*#/                                        , Action => Site::ParseData::SkipLine   }, # Skip Comments
-    { Name => "AllowAdd", RegEx  => qr/^\s*(AllowAdd)\s*(yes|no|Yes|No)/             ,Action => Site::ParseData::AddGlobal   },
-    {                     RegEx  => qr/^\s*GPIO\s*(\d+)/i                            ,Action => Site::ParseData::StartSection},
-    { Name => "Mode"    , RegEx => qr/^\s*Mode\s*=\s*(input|Input|output|Output)/i   ,Action => Site::ParseData::AddVar      },
-    { Name => "Logic"   , RegEx => qr/^\s*Logic\s*=\s*(normal|Normal|invert|Invert)/i,Action => Site::ParseData::AddVar      },
-    { Name => "Pull"    , RegEx => qr/^\s*Pull\s*=\s*(high|High|low|Low)/i           ,Action => Site::ParseData::AddVar      },
-    { Name => "Boot"    , RegEx => qr/^\s*Boot\s*=\s*(on|On|off|Off)/i               ,Action => Site::ParseData::AddVar      },
-    { Name => "Name"    , RegEx => qr/^\s*Name\s*=\s*"(.*)"/i                        ,Action => Site::ParseData::AddVar      },
-    { Name => "Comment" , RegEx => qr/^\s*Comment\s*=\s*"(.*)"/i                     ,Action => Site::ParseData::AddVar      },
+    {                     RegEx  => qr/^\s*#/                                    ,Action => Site::ParseData::SkipLine   }, # Skip Comments
+    { Name => "UserCanChangeNames", RegEx  => qr/^\s*UserCanChangeNames\s*(\w+)/ ,Action => Site::ParseData::AddGlobal   },
+    {                     RegEx  => qr/^\s*GPIO\s*(\d+)/i                        ,Action => Site::ParseData::StartSection},
+    { Name => "Mode"    , RegEx => qr/^\s*Mode\s*=\s*(\w+)/i                     ,Action => Site::ParseData::AddVar      },
+    { Name => "Logic"   , RegEx => qr/^\s*Logic\s*=\s*(\w+)/i                    ,Action => Site::ParseData::AddVar      },
+    { Name => "Pull"    , RegEx => qr/^\s*Pull\s*=\s*(\w+)/i                     ,Action => Site::ParseData::AddVar      },
+    { Name => "Boot"    , RegEx => qr/^\s*Boot\s*=\s*(\w+)/i                     ,Action => Site::ParseData::AddVar      },
+    { Name => "HName"   , RegEx => qr/^\s*HName\s*=\s*"(.*)"/i                   ,Action => Site::ParseData::AddVar      },
+    { Name => "UName"   , RegEx => qr/^\s*UName\s*=\s*"(.*)"/i                   ,Action => Site::ParseData::AddVar      },
+    { Name => "UDesc"   , RegEx => qr/^\s*UDesc\s*=\s*"(.*)"/i                   ,Action => Site::ParseData::AddVar      },
     ];
-
 
 ########################################################################################################################
 ########################################################################################################################
@@ -128,18 +130,18 @@ $Verbose = 1
 
 $GPIOConfig = GetGPIOConfig();
 
-print Data::Dumper->Dump([$GPIOConfig],["GPIOConfig"]);
-exit(0);
+# print Data::Dumper->Dump([$GPIOConfig],["GPIOConfig"]);
+# exit(0);
 
 ########################################################################################################################
 ########################################################################################################################
 #
 # Setup a web socket and listen for connections.
 #
-Message("GPIOServer is up and running.")
+Message("**** GPIOServer: GPIOServer is up and running.")
     if $Verbose;
 
-Message("Waiting for websocket connection")
+Message("**** GPIOServer: Waiting for websocket connection")
     if $Verbose;
 
 Site::WSServer::InitWSServer($SERVER_PORT,[],\&WebRequest,\&ConnectionRequest)->start;
@@ -182,23 +184,23 @@ sub WebRequest {
     my $Conn     = shift;
     my $Server   = shift;
     
-    kill "USR1",getppid         # Inform server of activity
-        unless $DB::single;     #   (but not if debugging)
+#    kill "USR1",getppid         # Inform server of activity
+#        unless $DB::single;     #   (but not if debugging)
 
     #
     # Lots of error checking for web requests.
     #
-    return Message("ConfigServer: No Web request")
+    return Message("**** GPIOServer: ConfigServer: No Web request")
         unless length $JSONText;
 
     my $Request = eval{decode_json $JSONText};              # Catches/avoids Croak() in lib function
 
-    return Message("ConfigServer: Bad JSON Web request: ($JSONText)")
+    return Message("**** GPIOServer: ConfigServer: Bad JSON Web request: ($JSONText)")
         unless defined $Request && (ref $Request) eq "HASH";
 
     $Request->{Type} //= "";
         
-    return Message("WebRequest: No request type: ($JSONText)")
+    return Message("**** GPIOServer: WebRequest: No request type: ($JSONText)")
         unless length $Request->{Type};
 
     #
@@ -206,7 +208,7 @@ sub WebRequest {
     #
     if( $Request->{Type} eq "GetGPIOConfig" ) {
         $Request->{Error} = "No error.";
-        Message("ConfigServer: GetGPIOConfig()")
+        Message("**** GPIOServer: ConfigServer: GetGPIOConfig()")
             if $Verbose;
         $Request->{State} = $GPIOConfig;
         }
@@ -216,7 +218,7 @@ sub WebRequest {
     #
     elsif( $Request->{Type} eq "SetGPIOConfig" ) {
         $Request->{Error} = "No error.";
-        Message("ConfigServer: SetGPIOConfig()")
+        Message("**** GPIOServer: ConfigServer: SetGPIOConfig()")
             if $Verbose;
         SetGPIOConfig($Request->{Arg1},$GPIOConfig,$Verbose);
         }
@@ -225,7 +227,7 @@ sub WebRequest {
     # SetGPIO - Set a GPIO output
     #
     elsif( $Request->{Type} eq "SetGPIO" ) {
-        Message("ConfigServer: GetWifiList()")
+        Message("**** GPIOServer: ConfigServer: GetWifiList()")
             if $Verbose;
         $Request->{Error} = "No error.";
 
@@ -236,7 +238,7 @@ sub WebRequest {
     # GetGPIO - Get a GPIOvalue (output or input)
     #
     elsif( $Request->{Type} eq "GetGPIO" ) {
-        Message("ConfigServer: GetWifiList()")
+        Message("**** GPIOServer: ConfigServer: GetWifiList()")
             if $Verbose;
         $Request->{Error} = "No error.";
 
@@ -247,7 +249,7 @@ sub WebRequest {
     # Unknown request type: Return error to caller
     #
     else {
-        Message("ConfigServer: Unknown request type ($Request->{Type})")
+        Message("**** GPIOServer: ConfigServer: Unknown request type ($Request->{Type})")
             if $Verbose;
         }
 
@@ -270,17 +272,73 @@ sub WebRequest {
 sub GetGPIOConfig {
     my $GPIOConfig;
 
+    ####################################################################################################################
+    #
+    # GPIO information, from config file
+    #
     return { Valid => 0 }
         unless -r $GPIOConfigFile;
 
     my $ConfigFile = Site::ParseData->new(Filename => $GPIOConfigFile, Matches  => $GPIOMatches);
-    my $GPIOInfo   = $ConfigFile->ParseFile();
-    $GPIOInfo->{Valid} = $ConfigFile->{Parsed};
+    $GPIOConfig   = $ConfigFile->ParseFile();
+
+    #
+    # Do some conversions and simple error checking on the GPIO input file
+    #
+    # GPIO    3
+    #     Mode=Output
+    #     Logic=Normal
+    #     Pull=High
+    #     Boot=Off
+    #     HName="Relay U3"
+    #     UName="Relay U3"
+    #     UDesc=""
+    #
+    $GPIOConfig->{UserCanChangeNames} = MatchArgs($GPIOConfig->{UserCanChangeNames}, "Yes","No","Global", "UserCanChangeNames");
+    $GPIOConfig->{Valid} = $ConfigFile->{Parsed};
+
+    foreach my $GPIOID (keys %{$GPIOConfig}) {
+
+        next
+            if $GPIOID eq "Valid" or $GPIOID eq "UserCanChangeNames";
+
+        exit Message("**** GPIOServer: GPIO ID ($GPIOID) is not valid number")
+            unless $GPIOID =~ /^\d+$/;
+
+        exit Message("**** GPIOServer: GPIO ID ($GPIOID) is out of range")
+            unless $GPIOID >= 0 and $GPIOID <= 31;
+
+        my $GPIO = $GPIOConfig->{GPIOID};
+
+        $GPIO->{ Mode} = MatchArgs($GPIO->{ Mode}, "Input","Output",$GPIOID, "Mode");
+        $GPIO->{Logic} = MatchArgs($GPIO->{Logic},"Normal","Invert",$GPIOID,"Logic");
+        $GPIO->{ Pull} = MatchArgs($GPIO->{ Pull},  "High",   "Low",$GPIOID, "Pull");
+        $GPIO->{ Boot} = MatchArgs($GPIO->{ Boot},   "Off",    "On",$GPIOID, "Boot");
+
+        $GPIO->{HName} = "GPIO$GPIOID"
+            unless defined $GPIO->{HName} and length $GPIO->{HName};
+
+        $GPIO->{UName} = "GPIO$GPIOID"
+            unless defined $GPIO->{UName} and length $GPIO->{UName};
+
+        $GPIO->{UDesc} = ""
+            unless defined $GPIO->{UDesc} and length $GPIO->{UDesc};
+        }
+
+    ####################################################################################################################
+    #
+    # SysName
+    #
+    $SysName = `cat /etc/hostname | tr -d " \t\n\r"`;
+    $SysName = inet_ntoa(scalar gethostbyname('localhost'))
+        unless length($SysName) and $SysName ne "";
+
+    $GPIOConfig->{SysName} = $SysName;
 
 # use Data::Dumper;
 # print Data::Dumper->Dump([$WPAInfo],[qw(WPAInfo)]);
 
-    return $GPIOInfo;
+    return $GPIOConfig;
     }
 
 ########################################################################################################################
@@ -304,3 +362,37 @@ sub SetGPIOConfig {
 #         if $Verbose;
 
     }
+
+
+########################################################################################################################
+########################################################################################################################
+#
+# MatchArgs - Match a GPIO description with one (of two) arguments
+#
+# Inputs:      Argument to match        (ex: "Mode")
+#              First possible match     (ex: "Input")
+#              TRUE if verbose mode     (ex: "Output")
+#              GPIO ID this arg applies to         (for error message)
+#              Argument name this match applies to (for error message)
+#
+# Outputs:     The canonical argument that matches (ie: "Input" or "Output", matched case insensitive)
+#
+# NOTES: If the $Arg is blank or undefined, the 1st match is given as default.
+#
+sub MatchArgs {
+    my $Arg     = shift;
+    my $Match1  = shift;
+    my $Match2  = shift;
+    my $GPIOID  = shift;
+    my $ArgName = shift;
+
+    $Arg = $Match1
+        unless defined $Arg and length $Arg;
+
+    if   ( $Arg =~ /$Match1/i ) { $Arg = $Match1; }
+    elsif( $Arg =~ /$Match2/i ) { $Arg = $Match2; }
+    else { exit Message("**** GPIOServer: GPIO ID ($GPIOID) $ArgName is not '$Match1' or '$Match2'"); }
+
+    return $Arg;
+    }
+

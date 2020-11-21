@@ -1,0 +1,46 @@
+@CHARSET "ISO-8859-1";
+
+* {
+    box-sizing: border-box;
+    border:     0;                  /* Comment this out for debugging */
+    }
+
+body {
+    background-color:   WhiteSmoke;
+    margin:         0;
+    }
+
+/***********************************************************************
+ *
+ * Other pages
+ */
+.PageDiv {
+    width:          100%;
+    max-width:      1024px;
+    display:        none;
+    }
+
+.SysName {
+    color:          brown;
+    }
+
+.NoBotMargin {
+    margin-bottom:  0;
+    }
+
+.Unchanged {
+    color:          grey;
+    }
+
+input:disabled {
+    background:     silver;
+    }
+
+input {
+    border-style:   solid;
+    border-width:   1px;
+    border-color:   black;
+    font-family:    helvetica, arial, sans serif;
+    padding-left:   0px;
+    font-size:      150%;
+    }
