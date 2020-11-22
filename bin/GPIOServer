@@ -24,10 +24,16 @@
 ##
 ##      $GPIOConfig->
 ##          {GPIO#}->'5'
-##              {Mode}  ->[ 'input', 'output',  ],
-##              {Value} ->[ 0, 1 ],                 # Current value
-##              {Invert}->[ T, F ],                 # If TRUE, logic is inverted
-##              {Device}->...                       # WiringPi struct for device
+##              {Mode }->Input          # One of:   Input   Output
+##              {Logic}->Invert         #           Invert  Normal
+##              {Pull }->High           #           High    Low
+##              {Boot }->Low            # Value to take at bootup
+##              {HName}->"Relay 1"      # Hardware name
+##              {UName}->"Keurig"       # User's   assigned name
+##              {UDesc}->"Coffee maker in the kitchen"
+##
+##      The logic will convert keywords to camel case; thus, it is sufficient to
+##        say things like "if $GPIO->{Logic} eq "Invert" and expect an exact match.
 ##
 ########################################################################################################################
 ########################################################################################################################
@@ -60,6 +66,9 @@ use Carp;
 
 our $VERSION = 'GPIOServer2020-10-20';
 
+use RPi::Pin;
+use RPi::Const qw(:all);
+
 use JSON;
 use Data::Dumper;
 use File::Slurp qw(read_file);
@@ -69,6 +78,7 @@ use lib "$ENV{HOME}/GPIOServer/lib";
 use Site::Process;
 use Site::WSServer;
 use Site::ParseData;
+use Site::RasPiUtils;
 
 ########################################################################################################################
 ########################################################################################################################
@@ -81,20 +91,23 @@ use Site::ParseData;
 our $SERVER_PORT = 2021;
 
 our $Server;
-our $GPIOConfig;
+our $GPIOInfo;
 our $SysName;
+our $GPIOConfig;
 
 #  #
 #  # Comment
 #  #
-#  AllowAdd no                 # When yes, config allows user to add to this file
+#  UserCanChangeNames yes      # Allow user to change UName and UDesc
 #
 #  GPIO    7
 #      Mode=Input              # One of:   Input   Output
 #      Logic=Invert            #           Invert  Normal
 #      Pull=High               #           High    Low
-#      Name="Keurig"
-#      Comment="Coffee maker in the kitchen"
+#      Boot=Low                # Value to take at bootup
+#      HName="Relay 1"         # Hardware name
+#      UName="Keurig"          # User's   assigned name
+#      UDesc="Coffee maker in the kitchen"
 #
 our $GPIOConfigFile = "$ENV{HOME}/GPIOServer/etc/GPIO.conf";
 our $GPIOMatches = [
@@ -128,10 +141,11 @@ my $Verbose = 0;
 $Verbose = 1
     if defined $ARGV[0] and $ARGV[0] eq "-v";
 
-$GPIOConfig = GetGPIOConfig();
+$GPIOInfo = GetGPIOInfo();
+$SysName  = GetHostname();
 
-# print Data::Dumper->Dump([$GPIOConfig],["GPIOConfig"]);
-# exit(0);
+print Data::Dumper->Dump([$GPIOInfo],["GPIOInfo"]);
+exit(0);
 
 ########################################################################################################################
 ########################################################################################################################
@@ -263,14 +277,13 @@ sub WebRequest {
 ########################################################################################################################
 ########################################################################################################################
 #
-# GetGPIOConfig - Set up a local config struct with all the information the server needs.
+# GetGPIOInfo - Set up a local config struct with all the GPIO information.
 #
 # Inputs:      None.
 #
-# Outputs:     GPIOConfig struct.
+# Outputs:     GPIO info struct
 #
-sub GetGPIOConfig {
-    my $GPIOConfig;
+sub GetGPIOInfo {
 
     ####################################################################################################################
     #
@@ -280,40 +293,52 @@ sub GetGPIOConfig {
         unless -r $GPIOConfigFile;
 
     my $ConfigFile = Site::ParseData->new(Filename => $GPIOConfigFile, Matches  => $GPIOMatches);
-    $GPIOConfig   = $ConfigFile->ParseFile();
+    my $GPIOInfo   = $ConfigFile->ParseFile();
 
-    #
-    # Do some conversions and simple error checking on the GPIO input file
-    #
-    # GPIO    3
-    #     Mode=Output
-    #     Logic=Normal
-    #     Pull=High
-    #     Boot=Off
-    #     HName="Relay U3"
-    #     UName="Relay U3"
-    #     UDesc=""
-    #
-    $GPIOConfig->{UserCanChangeNames} = MatchArgs($GPIOConfig->{UserCanChangeNames}, "Yes","No","Global", "UserCanChangeNames");
-    $GPIOConfig->{Valid} = $ConfigFile->{Parsed};
+    $GPIOInfo->{UserCanChangeNames} = MatchArgs($GPIOInfo->{UserCanChangeNames}, "Yes","No","Global","UserCanChangeNames");
+    $GPIOInfo->{Valid} = $ConfigFile->{Parsed};
 
-    foreach my $GPIOID (keys %{$GPIOConfig}) {
+    foreach my $GPIOID (keys %{$GPIOInfo}) {
 
         next
             if $GPIOID eq "Valid" or $GPIOID eq "UserCanChangeNames";
 
+        ################################################################################################################
+        #
+        # Do some conversions and simple error checking on the GPIO input file
+        #
+        # GPIO    3
+        #     Mode=Output
+        #     Logic=Normal
+        #     Pull=High
+        #     Boot=Off
+        #     HName="Relay U3"
+        #     UName="Relay U3"
+        #     UDesc=""
+        #
         exit Message("**** GPIOServer: GPIO ID ($GPIOID) is not valid number")
             unless $GPIOID =~ /^\d+$/;
 
         exit Message("**** GPIOServer: GPIO ID ($GPIOID) is out of range")
             unless $GPIOID >= 0 and $GPIOID <= 31;
 
-        my $GPIO = $GPIOConfig->{GPIOID};
+        my $GPIO = $GPIOInfo->{$GPIOID};
 
         $GPIO->{ Mode} = MatchArgs($GPIO->{ Mode}, "Input","Output",$GPIOID, "Mode");
         $GPIO->{Logic} = MatchArgs($GPIO->{Logic},"Normal","Invert",$GPIOID,"Logic");
-        $GPIO->{ Pull} = MatchArgs($GPIO->{ Pull},  "High",   "Low",$GPIOID, "Pull");
         $GPIO->{ Boot} = MatchArgs($GPIO->{ Boot},   "Off",    "On",$GPIOID, "Boot");
+
+        #
+        # Pull takes "High", "Low", or "None".
+        #
+        if( $GPIO->{Mode} eq "Input" ) {
+
+            $GPIO->{Pull} = "None"
+                unless defined $GPIO->{Pull} and length $GPIO->{Pull};
+
+            if( $GPIO->{Pull} =~ /None/i ) { $GPIO->{Pull} = "None"; }
+            else { $GPIO->{Pull} = MatchArgs($GPIO->{Pull},  "High",   "Low",$GPIOID, "Pull"); }
+            }
 
         $GPIO->{HName} = "GPIO$GPIOID"
             unless defined $GPIO->{HName} and length $GPIO->{HName};
@@ -321,24 +346,40 @@ sub GetGPIOConfig {
         $GPIO->{UName} = "GPIO$GPIOID"
             unless defined $GPIO->{UName} and length $GPIO->{UName};
 
-        $GPIO->{UDesc} = ""
+        $GPIO->{UDesc} = "---"
             unless defined $GPIO->{UDesc} and length $GPIO->{UDesc};
+
+        ################################################################################################################
+        #
+        # Connect to the GPIO in question and get the current value
+        #
+        my $Device = RPi::Pin->new($GPIOID);
+
+        if( $GPIO->{Mode} eq "Input" ) { 
+            $Device->mode(INPUT); 
+            if(    $GPIO->{Pull} eq "High" ) { $Device->pull(PUD_UP)  ; }
+            elsif( $GPIO->{Pull} eq "Low"  ) { $Device->pull(PUD_DOWN); }
+            else                             { $Device->pull(PUD_OFF) ; }
+            }
+        else                           { 
+            #
+            # Avoid pathological spike that can happen if we set the mode
+            #   before setting the output value.
+            #
+            if( $GPIO->{Boot} eq "Low" ) { $Device->write(LOW) ; }
+            else                         { $Device->write(HIGH); }
+
+            $Device->mode(OUTPUT); 
+
+            if( $GPIO->{Boot} eq "Low" ) { $Device->write(LOW) ; }
+            else                         { $Device->write(HIGH); }
+            }
+
+        $GPIO->{ Value} = $Device->read();
+        $GPIO->{Device} = $Device;
         }
 
-    ####################################################################################################################
-    #
-    # SysName
-    #
-    $SysName = `cat /etc/hostname | tr -d " \t\n\r"`;
-    $SysName = inet_ntoa(scalar gethostbyname('localhost'))
-        unless length($SysName) and $SysName ne "";
-
-    $GPIOConfig->{SysName} = $SysName;
-
-# use Data::Dumper;
-# print Data::Dumper->Dump([$WPAInfo],[qw(WPAInfo)]);
-
-    return $GPIOConfig;
+    return $GPIOInfo;
     }
 
 ########################################################################################################################

@@ -1,0 +1,10 @@
+#
+# Don't save log files, or the containing directory
+#
+/logs
+#
+# Files used for debugging
+#
+bin/hp
+bin/pe
+bin/we

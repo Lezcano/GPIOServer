@@ -25,6 +25,8 @@
 ##      NumUsers()              # Return number of logged-in users of the system
 ##      ListInterfaces()        # Return a list of interfaces on the system
 ##      DiskExpanded()          # Return TRUE if disk is expanded
+##
+##      GetHostname()           $ Return system host name
 ##      ChangeHostname($Name)   # Change the hostname files
 ##
 ##  ISA
@@ -70,6 +72,7 @@ our @EXPORT  = qw(&Reboot
                   &NumUsers
                   &ListInterfaces
                   &DiskExpanded
+                  &GetHostname
                   &ChangeHostname
                   );               # Export by default
 
@@ -160,6 +163,27 @@ sub DiskExpanded {
     `DiskExpanded`;
 
     return $? == 0;
+    }
+
+
+########################################################################################################################
+########################################################################################################################
+##
+## GetHostname - Return system hostname
+##
+## Inputs:      None.
+##
+## Outputs:     Hostname, from hostname file
+##              IP address if hostname not yet set
+##
+sub GetHostname {
+    my $Hostname;
+
+    $Hostname = `cat /etc/hostname | tr -d " \t\n\r"`;
+    $Hostname = inet_ntoa(scalar gethostbyname('localhost'))
+        unless length($Hostname) and $Hostname ne "";
+
+    return $Hostname;
     }
 
 

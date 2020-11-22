@@ -57,7 +57,7 @@
     //
     var GPIOTemplate = '\
         <tr><td style="width: 20%">&nbsp;</td>                              \
-            <td>$UName</td><td>$ONOFF</td><td>$UDesc</td>                   \
+            <td>$UNAME</td><td>$ONOFF</td><td>$UDESC</td>                   \
             </tr>';
 
     //
@@ -102,16 +102,16 @@
             console.log("Msg: "+Event.data);
 
             if( ConfigData["Type"] == "GetGPIOConfig" ) {
-                console.log(ConfigData);
                 GPIOConfig      = ConfigData.State;
                 OrigGPIOConfig  = JSON.parse(Event.data).State;     // Deep clone
+                console.log(GPIOConfig);
 
                 SysNameElements = document.getElementsByClassName("SysName");
                 for (i = 0; i < SysNameElements.length; i++) {
                     SysNameElements[i].innerHTML = OrigGPIOConfig.SysName;
                     };
 
-                GotoPage("GPIOControlPage");
+                GotoPage("ControlPage");
                 return;
                 }
 
@@ -158,34 +158,15 @@
         var GPIOTable = document.getElementById("GPIOTable");
         GPIOTable.innerHTML = "";
 
-        GPIOConfig.forEach(function (GPIO) { 
-
-            //
-            // Only take GPIO entries, skip global vars such as "Valid"
-            //
-            if( !GPIO.match(/^\d+$/) ) {
-                continue;
-                }
+        GPIOConfig.GPIOS.forEach(function (GPIO) { 
 
             //
             // Make an entry in the table for this GPIO
             //
-            var GPIOEntry = GPIOTemplate.replaceAll("$UNAME",GPIOConfig[GPIO].UName)
-                                        .replaceAll("$UDesc",GPIOConfig[GPIO].UDesc)
+            var GPIOEntry = GPIOTemplate.replaceAll("$UNAME",GPIO.UName)
+                                        .replaceAll("$UDESC",GPIO.UDesc)
             GPIOTable.innerHTML += GPIOEntry;
-
-            if( Config.DHCPInfo[IF].Enabled ) {
-                var StaticTable = StaticTemplate.replaceAll("$IF"    ,IF)
-                                                .replaceAll("$DHCP"  ,Config.DHCPInfo[IF].DHCP ? "checked"  : "")
-                                                .replaceAll("$DDIS"  ,Config.DHCPInfo[IF].DHCP ? "disabled" : "")
-                                                .replaceAll("$IPAddr",Config.DHCPInfo[IF].IPAddr)
-                                                .replaceAll("$Router",Config.DHCPInfo[IF].Router)
-                                                .replaceAll("$DNS1"  ,Config.DHCPInfo[IF].DNS1)
-                                                .replaceAll("$DNS2"  ,Config.DHCPInfo[IF].DNS2);
-                IFTable.innerHTML += StaticTable; 
-                }
             });
-
         }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
