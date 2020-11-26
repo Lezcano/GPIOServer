@@ -91,14 +91,14 @@ use Site::RasPiUtils;
 our $SERVER_PORT = 2021;
 
 our $Server;
-our $GPIOInfo;
 our $SysName;
-our $GPIOConfig;
+our $GPIOConfig;        # Full description of GPIO block
+our $WebInfo;           # Info given to web page
 
 #  #
 #  # Comment
 #  #
-#  UserCanChangeNames yes      # Allow user to change UName and UDesc
+#  AllowRename yes             # Allow user to change UName and UDesc
 #
 #  GPIO    7
 #      Mode=Input              # One of:   Input   Output
@@ -109,18 +109,20 @@ our $GPIOConfig;
 #      UName="Keurig"          # User's   assigned name
 #      UDesc="Coffee maker in the kitchen"
 #
+our $RenameKey = "AllowRename";
+
 our $GPIOConfigFile = "$ENV{HOME}/GPIOServer/etc/GPIO.conf";
 our $GPIOMatches = [
-    {                     RegEx  => qr/^\s*#/                                    ,Action => Site::ParseData::SkipLine   }, # Skip Comments
-    { Name => "UserCanChangeNames", RegEx  => qr/^\s*UserCanChangeNames\s*(\w+)/ ,Action => Site::ParseData::AddGlobal   },
-    {                     RegEx  => qr/^\s*GPIO\s*(\d+)/i                        ,Action => Site::ParseData::StartSection},
-    { Name => "Mode"    , RegEx => qr/^\s*Mode\s*=\s*(\w+)/i                     ,Action => Site::ParseData::AddVar      },
-    { Name => "Logic"   , RegEx => qr/^\s*Logic\s*=\s*(\w+)/i                    ,Action => Site::ParseData::AddVar      },
-    { Name => "Pull"    , RegEx => qr/^\s*Pull\s*=\s*(\w+)/i                     ,Action => Site::ParseData::AddVar      },
-    { Name => "Boot"    , RegEx => qr/^\s*Boot\s*=\s*(\w+)/i                     ,Action => Site::ParseData::AddVar      },
-    { Name => "HName"   , RegEx => qr/^\s*HName\s*=\s*"(.*)"/i                   ,Action => Site::ParseData::AddVar      },
-    { Name => "UName"   , RegEx => qr/^\s*UName\s*=\s*"(.*)"/i                   ,Action => Site::ParseData::AddVar      },
-    { Name => "UDesc"   , RegEx => qr/^\s*UDesc\s*=\s*"(.*)"/i                   ,Action => Site::ParseData::AddVar      },
+    {                     RegEx  => qr/^\s*#/                   ,Action => Site::ParseData::SkipLine    }, # Skip Comments
+    { Name => $RenameKey, RegEx  => qr/^\s*AllowRename\s*(\w+)/ ,Action => Site::ParseData::AddGlobal   },
+    {                     RegEx  => qr/^\s*GPIO\s*(\d+)/i       ,Action => Site::ParseData::StartSection},
+    { Name => "Mode"    , RegEx => qr/^\s*Mode\s*=\s*(\w+)/i    ,Action => Site::ParseData::AddVar      },
+    { Name => "Logic"   , RegEx => qr/^\s*Logic\s*=\s*(\w+)/i   ,Action => Site::ParseData::AddVar      },
+    { Name => "Pull"    , RegEx => qr/^\s*Pull\s*=\s*(\w+)/i    ,Action => Site::ParseData::AddVar      },
+    { Name => "Boot"    , RegEx => qr/^\s*Boot\s*=\s*(\w+)/i    ,Action => Site::ParseData::AddVar      },
+    { Name => "HName"   , RegEx => qr/^\s*HName\s*=\s*"(.*)"/i  ,Action => Site::ParseData::AddVar      },
+    { Name => "UName"   , RegEx => qr/^\s*UName\s*=\s*"(.*)"/i  ,Action => Site::ParseData::AddVar      },
+    { Name => "UDesc"   , RegEx => qr/^\s*UDesc\s*=\s*"(.*)"/i  ,Action => Site::ParseData::AddVar      },
     ];
 
 ########################################################################################################################
@@ -141,11 +143,13 @@ my $Verbose = 0;
 $Verbose = 1
     if defined $ARGV[0] and $ARGV[0] eq "-v";
 
-$GPIOInfo = GetGPIOInfo();
-$SysName  = GetHostname();
+$GPIOConfig = GetGPIOConfig();
+$SysName    = GetHostname();
 
-print Data::Dumper->Dump([$GPIOInfo],["GPIOInfo"]);
-exit(0);
+$WebInfo->{SysName} = $SysName;
+
+# print Data::Dumper->Dump([$WebInfo],["WebInfo"]);
+# exit(0);
 
 ########################################################################################################################
 ########################################################################################################################
@@ -204,59 +208,49 @@ sub WebRequest {
     #
     # Lots of error checking for web requests.
     #
-    return Message("**** GPIOServer: ConfigServer: No Web request")
+    return Message("**** GPIOServer: No Web request")
         unless length $JSONText;
 
     my $Request = eval{decode_json $JSONText};              # Catches/avoids Croak() in lib function
 
-    return Message("**** GPIOServer: ConfigServer: Bad JSON Web request: ($JSONText)")
+    return Message("**** GPIOServer: Bad JSON Web request: ($JSONText)")
         unless defined $Request && (ref $Request) eq "HASH";
 
     $Request->{Type} //= "";
         
-    return Message("**** GPIOServer: WebRequest: No request type: ($JSONText)")
+    return Message("**** GPIOServer: No request type: ($JSONText)")
         unless length $Request->{Type};
 
     #
-    # GetGPIOConfig - Return the complete GPIO configuration struct
+    # GetWebInfo - Return the web GPIO information
     #
-    if( $Request->{Type} eq "GetGPIOConfig" ) {
+    if( $Request->{Type} eq "GetWebInfo" ) {
         $Request->{Error} = "No error.";
-        Message("**** GPIOServer: ConfigServer: GetGPIOConfig()")
+        Message("**** GPIOServer: GetWebInfo()")
             if $Verbose;
-        $Request->{State} = $GPIOConfig;
+        GetGPIOValues();
+        $Request->{State} = $WebInfo;
         }
 
     #
-    # SetGPIOConfig - Implement new GPIO configuration
+    # SetWebInfo - Implement new GPIO user name and comment
     #
-    elsif( $Request->{Type} eq "SetGPIOConfig" ) {
+    elsif( $Request->{Type} eq "SetWebInfo" ) {
         $Request->{Error} = "No error.";
-        Message("**** GPIOServer: ConfigServer: SetGPIOConfig()")
+        Message("**** GPIOServer: SetWebInfo()")
             if $Verbose;
-        SetGPIOConfig($Request->{Arg1},$GPIOConfig,$Verbose);
+        SetWebInfo($Request->{Arg1},$WebInfo,$Verbose);
         }
 
     #
-    # SetGPIO - Set a GPIO output
+    # ToggleGPIO - Change value of GPIO output
     #
-    elsif( $Request->{Type} eq "SetGPIO" ) {
-        Message("**** GPIOServer: ConfigServer: GetWifiList()")
+    elsif( $Request->{Type} eq "ToggleGPIO" ) {
+        Message("**** GPIOServer: ToggleGPIO($Request->{Arg1})")
             if $Verbose;
-        $Request->{Error} = "No error.";
-
-# print Data::Dumper->Dump([$Request->{State}],[qw(IWList)]);
-        }
-
-    #
-    # GetGPIO - Get a GPIOvalue (output or input)
-    #
-    elsif( $Request->{Type} eq "GetGPIO" ) {
-        Message("**** GPIOServer: ConfigServer: GetWifiList()")
-            if $Verbose;
-        $Request->{Error} = "No error.";
-
-# print Data::Dumper->Dump([$Request->{State}],[qw(IWList)]);
+        $Request->{Error} = ToggleGPIO($Request->{Arg1});
+        GetGPIOValues();
+        $Request->{State} = $WebInfo;
         }
 
     #
@@ -277,13 +271,13 @@ sub WebRequest {
 ########################################################################################################################
 ########################################################################################################################
 #
-# GetGPIOInfo - Set up a local config struct with all the GPIO information.
+# GetGPIOConfig - Set up a local config struct with all the GPIO information.
 #
 # Inputs:      None.
 #
 # Outputs:     GPIO info struct
 #
-sub GetGPIOInfo {
+sub GetGPIOConfig {
 
     ####################################################################################################################
     #
@@ -293,15 +287,17 @@ sub GetGPIOInfo {
         unless -r $GPIOConfigFile;
 
     my $ConfigFile = Site::ParseData->new(Filename => $GPIOConfigFile, Matches  => $GPIOMatches);
-    my $GPIOInfo   = $ConfigFile->ParseFile();
+    my $GPIOConfig = $ConfigFile->ParseFile();
 
-    $GPIOInfo->{UserCanChangeNames} = MatchArgs($GPIOInfo->{UserCanChangeNames}, "Yes","No","Global","UserCanChangeNames");
-    $GPIOInfo->{Valid} = $ConfigFile->{Parsed};
+    $GPIOConfig->{$RenameKey} = MatchArgs($GPIOConfig->{$RenameKey}, "Yes","No","Global",$RenameKey);
+    $GPIOConfig->{Valid} = $ConfigFile->{Parsed};
 
-    foreach my $GPIOID (keys %{$GPIOInfo}) {
+    $WebInfo = { $RenameKey => $GPIOConfig->{$RenameKey} // "Yes", GPIOInfo => [] };
+
+    foreach my $GPIOID (keys %{$GPIOConfig}) {
 
         next
-            if $GPIOID eq "Valid" or $GPIOID eq "UserCanChangeNames";
+            if $GPIOID eq "Valid" or $GPIOID eq $RenameKey;
 
         ################################################################################################################
         #
@@ -322,7 +318,7 @@ sub GetGPIOInfo {
         exit Message("**** GPIOServer: GPIO ID ($GPIOID) is out of range")
             unless $GPIOID >= 0 and $GPIOID <= 31;
 
-        my $GPIO = $GPIOInfo->{$GPIOID};
+        my $GPIO = $GPIOConfig->{$GPIOID};
 
         $GPIO->{ Mode} = MatchArgs($GPIO->{ Mode}, "Input","Output",$GPIOID, "Mode");
         $GPIO->{Logic} = MatchArgs($GPIO->{Logic},"Normal","Invert",$GPIOID,"Logic");
@@ -377,15 +373,76 @@ sub GetGPIOInfo {
 
         $GPIO->{ Value} = $Device->read();
         $GPIO->{Device} = $Device;
+
+        push @{$WebInfo->{GPIOInfo}},{ UName  => $GPIO->{ UName}, 
+                                       UDesc  => $GPIO->{ UDesc}, 
+                                       HName  => $GPIO->{ HName}, 
+                                       Mode   => $GPIO->{  Mode},
+                                       Invert => $GPIO->{Invert},
+                                       ID     => $GPIOID };
         }
 
-    return $GPIOInfo;
+    return $GPIOConfig;
     }
+
 
 ########################################################################################################################
 ########################################################################################################################
 #
-# SetGPIOConfig - Set a new GPIO config
+# GetGPIOValues - Read current values for all GPIOs
+#
+# Inputs:      None.
+#
+# Outputs:     None. Values are set in place at $WebInfo->{GPIOInfo}
+#
+sub GetGPIOValues {
+
+    #
+    # Run through the existing GPIO list, getting current values
+    #
+    foreach my $GPIO (@{$WebInfo->{GPIOInfo}}) {
+        my $Value = $GPIOConfig->{$GPIO->{ID}}->{Device}->read();
+
+        $Value = 1 - $Value
+            if $GPIOConfig->{$GPIO->{ID}}->{Logic} eq "Invert";
+
+        $GPIO->{Value} = $Value ? "On" : "Off";
+        }
+    }
+
+
+########################################################################################################################
+########################################################################################################################
+#
+# ToggleGPIO - Toggle value of GPIO
+#
+# Inputs:      ID of GPIO to toggle
+#
+# Outputs:     Error msg, or "No error."
+#
+sub ToggleGPIO {
+    my $GPIOID = shift;
+    my $Rtnval = "No error.";
+
+    my $GPIO = $GPIOConfig->{$GPIOID};
+
+    if( $GPIO->{Mode} ne "Output" ) {
+        Message("**** GPIOServer: Not an output device ($GPIOID)")
+            if $Verbose;
+        return "Not an output device ($GPIOID)";
+        }
+
+    my $Value = $GPIO->{Device}->read();
+    $GPIO->{Device}->write(1 - $Value);
+
+    return $Rtnval;
+    }
+
+
+########################################################################################################################
+########################################################################################################################
+#
+# SetWebInfo - Set a new GPIO config
 #
 # Inputs:      Requested config state
 #              Original  config state (for comparison)
@@ -393,15 +450,13 @@ sub GetGPIOInfo {
 #
 # Outputs:     None
 #
-sub SetGPIOConfig {
-    my $NewState  = shift;
-    my $OrigState = shift;
-    my $Verbose   = shift;
+sub SetWebInfo {
+    my $NewInfo  = shift;
+    my $OrigInfo = shift;
+    my $Verbose  = shift;
 
-
-#     print Data::Dumper->Dump([$NewState],["NewConfig"])
-#         if $Verbose;
-
+    print Data::Dumper->Dump([$NewInfo],["NewInfo"])
+        if $Verbose;
     }
 
 
@@ -436,4 +491,3 @@ sub MatchArgs {
 
     return $Arg;
     }
-

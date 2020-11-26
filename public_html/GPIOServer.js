@@ -28,15 +28,14 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
-//      Config->
-//          {GPIO#}->'5'
-//              {Mode}   -> [  'Input', 'Output' ],        # (Required)
-//              {Logic}  -> [ 'Normal', 'Invert' ],        # Whether On means High ("Normal") or Low ("Invert")
-//              {Pull}   -> [   'High',    'Low' ],        # If Mode:Input,  whether input is pulled high or low
-//              {Boot}   -> [     'On',    'Off' ],        # If Mode:Output, state set at boot time
-//              {Value}  -> [     'On',    'Off' ],        # Current value
-//              {Name}   -> "Keurig"                       # User assigned name
-//              {Comment}-> "Coffee maker in the kitchen"  # User assigned comment
+//      WebInfo->
+//          {GPIOInfo}->[]
+//              {UName}-> "Keurig",                         # User assigned name
+//              {UDesc}-> "Coffee maker in the kitchen"     # User assigned comment
+//              {HName}-> "Relay 1"                         # Hardware name
+//              {Mode} -> [ 'Input', 'Output' ],
+//              {Value}-> [    'On',    'Off' ],            # Current value
+//              {ID}                                        # (unused by web page)
 //
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -49,16 +48,31 @@
     var WindowWidth;
     var WindowHeight;
 
-    var GPIOConfig;
-    var OrigGPIOConfig;
+    var WebInfo;
+    var OrigWebInfo;
+    var SwitchOnSound;
+    var SwitchOffSound;
 
     //
     // One line of the GPIO control table listing
     //
-    var GPIOTemplate = '\
-        <tr><td style="width: 20%">&nbsp;</td>                              \
-            <td>$UNAME</td><td>$ONOFF</td><td>$UDESC</td>                   \
+    var ControlTemplate = '                     \
+        <tr><td>$UNAME</td>                     \
+            <td><img id="Control$ID" class="GPIOValue" src="images/SwitchOff.png" title="GPIO Value" onclick=ToggleGPIO(this) /></td>    \
+            <td>$UDESC</td>                     \
             </tr>';
+
+    //
+    // One line of the GPIO config table listing
+    //
+    var ConfigTemplate = '\
+        <tr><td>$HNAME:</td>                    \
+            <td><input id="UName$ID" type="text" value="$UNAME" maxlength="8" size="10" \></td> \
+            <td><input id="UDesc$ID" type="text" value="$UDESC" \></td> \
+            </tr>';
+
+    var InputText  = '<tr><td><h3>Inputs </h3></td><td></td></tr>';
+    var OutputText = '<tr><td><h3>Outputs</h3></td><td></td></tr>';
 
     //
     // On first load, calculate reliable page dimensions and do page-specific initialization
@@ -72,13 +86,15 @@
 
         PageInit();     // Page specific initialization
 
+        SwitchOnSound  = new Audio("images/SwitchOn.wav" );
+        SwitchOffSound = new Audio("images/SwitchOff.wav");
         ConfigConnect();
         }
 
     //
     // Send a command to the web page
     //
-    function ConfigCommand(Command,Arg1,Arg2,Arg3) {
+    function ServerCommand(Command,Arg1,Arg2,Arg3) {
         ConfigSocket.send(JSON.stringify({
             "Type"  : Command,
             "Arg1"  : Arg1,
@@ -99,23 +115,33 @@
                 return;
                 }
 
-            console.log("Msg: "+Event.data);
+//            console.log("Msg: "+Event.data);
 
-            if( ConfigData["Type"] == "GetGPIOConfig" ) {
-                GPIOConfig      = ConfigData.State;
-                OrigGPIOConfig  = JSON.parse(Event.data).State;     // Deep clone
-                console.log(GPIOConfig);
+            if( ConfigData["Type"] == "GetWebInfo" ) {
+                WebInfo     = ConfigData.State;
+                OrigWebInfo  = JSON.parse(Event.data).State;     // Deep clone
+                console.log(WebInfo);
 
                 SysNameElements = document.getElementsByClassName("SysName");
                 for (i = 0; i < SysNameElements.length; i++) {
-                    SysNameElements[i].innerHTML = OrigGPIOConfig.SysName;
+                    SysNameElements[i].innerHTML = OrigWebInfo.SysName;
                     };
 
+                PopulateGPIOPages();
+                SetGPIOValues();
                 GotoPage("ControlPage");
                 return;
                 }
 
-            if( ConfigData["Type"] == "SetGPIOConfig" ) {
+            if( ConfigData["Type"] == "ToggleGPIO" ) {
+                console.log(ConfigData);
+                WebInfo = ConfigData.State;
+                SetGPIOValues();
+                return;
+                }
+
+
+            if( ConfigData["Type"] == "SetWebInfo" ) {
 //                console.log(ConfigData);
                 return;
                 }
@@ -128,10 +154,9 @@
             };
 
         ConfigSocket.onopen = function(Event) {
-            ConfigCommand("GetGPIOConfig");
+            ServerCommand("GetWebInfo");
             }
         };
-
 
     //
     // Cycle through the various pages
@@ -154,24 +179,117 @@
     //
     // PopulateGPIOControlPage - Populate the landing page as needed
     //
-    function PopulateControlPage() {
-        var GPIOTable = document.getElementById("GPIOTable");
-        GPIOTable.innerHTML = "";
-
-        GPIOConfig.GPIOS.forEach(function (GPIO) { 
-
-            //
-            // Make an entry in the table for this GPIO
-            //
-            var GPIOEntry = GPIOTemplate.replaceAll("$UNAME",GPIO.UName)
-                                        .replaceAll("$UDESC",GPIO.UDesc)
-            GPIOTable.innerHTML += GPIOEntry;
-            });
-        }
+    function PopulateControlPage() {}
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //
     // PopulateGPIOConfigPage - Populate the configuration page as needed
     //
-    function PopulateConfigPage() {
+    function PopulateConfigPage() {}
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    //
+    // PopulateGPIOPages - Populate the GPIO pages with config info
+    //
+    function PopulateGPIOPages() {
+        var ValueTable = document.getElementById("GPIOValues");
+        ValueTable.innerHTML = OutputText;
+
+        var NamesTable = document.getElementById("GPIONames");
+        NamesTable.innerHTML = OutputText;
+
+        WebInfo.GPIOInfo.forEach(function (GPIO) { 
+
+            if( GPIO.Mode == "Input" )
+                return;
+
+            //
+            // Make an entry in both tables for this GPIO
+            //
+            var GPIOEntry = ControlTemplate.replaceAll("$ID"   ,GPIO.ID)
+                                           .replaceAll("$UNAME",GPIO.UName)
+                                           .replaceAll("$UDESC",GPIO.UDesc);
+            ValueTable.innerHTML += GPIOEntry;
+
+            var NameEntry = ConfigTemplate.replaceAll("$ID"   ,GPIO.ID)
+                                          .replaceAll("$UNAME",GPIO.UName)
+                                          .replaceAll("$UDESC",GPIO.UDesc)
+                                          .replaceAll("$HNAME",GPIO.HName);
+            NamesTable.innerHTML += NameEntry;
+            });
+
+        ValueTable.innerHTML += InputText;
+        NamesTable.innerHTML += InputText;
+
+        WebInfo.GPIOInfo.forEach(function (GPIO) { 
+
+            if( GPIO.Mode == "Output" )
+                return;
+
+            //
+            // Make an entry in both tables for this GPIO
+            //
+            var GPIOEntry = ControlTemplate.replaceAll("$ID"   ,GPIO.ID)
+                                           .replaceAll("$UNAME",GPIO.UName)
+                                           .replaceAll("$UDESC",GPIO.UDesc);
+            ValueTable.innerHTML += GPIOEntry;
+
+            var NameEntry = ConfigTemplate.replaceAll("$ID"   ,GPIO.ID)
+                                          .replaceAll("$UNAME",GPIO.UName)
+                                          .replaceAll("$UDESC",GPIO.UDesc)
+                                          .replaceAll("$HNAME",GPIO.HName);
+            NamesTable.innerHTML += NameEntry;
+            });
+
+        //
+        // See if user is allowed to rename GPIOs
+        //
+        if( WebInfo.AllowRename == "No" ) {
+            document.getElementById("ConfigButton").style.display = "none";
+            }
+        }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    //
+    // SetGPIOValues - Set the appropriate GPIO values in the web pages
+    //
+    function SetGPIOValues() {
+
+        ValueElements = document.getElementsByClassName("GPIOValue");
+
+        for (i = 0; i < ValueElements.length; i++) {
+            var Image  = ValueElements[i];
+            var GPIOID = Image.id.replace('Control','').replace('Config','');
+            var GPIO   = WebInfo.GPIOInfo.find(function (GPIO) { return GPIO.ID == GPIOID; });
+
+            if( GPIO.Mode == "Input" ) { Image.src  = "images/LED"    + GPIO.Value + ".png"; }
+            else                       { Image.src  = "images/Switch" + GPIO.Value + ".png"; }
+            };
+        }
+
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    //
+    // ToggleGPIO - Change state of GPIO output
+    //
+    function ToggleGPIO(Element) {
+        var GPIOID = Element.id.replace('Control','').replace('Config','');
+        var GPIO   = WebInfo.GPIOInfo.find(function (GPIO) { return GPIO.ID == GPIOID; });
+
+        if( GPIO.Mode == "Input" ) {
+            return;
+            }
+
+        ServerCommand("ToggleGPIO",GPIOID);
+
+        if( GPIO.Value == "On" ) { SwitchOffSound.play(); }
+        else                     { SwitchOnSound.play();  }
+        }
+
+    ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    //
+    // ChangeGPIONames - Change the GPIO user names (and comments)
+    //
+    function ChangeGPIONames() {
+        GotoPage("ControlPage");
         }

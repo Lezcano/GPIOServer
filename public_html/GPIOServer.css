@@ -1,13 +1,14 @@
 @CHARSET "ISO-8859-1";
 
 * {
-    box-sizing: border-box;
-    border:     0;                  /* Comment this out for debugging */
+    box-sizing:     border-box;
+    border:         0;                  /* Comment this out for debugging */
     }
 
 body {
     background-color:   WhiteSmoke;
     margin:         0;
+    font-size:      100%;
     }
 
 /***********************************************************************
@@ -24,16 +25,23 @@ body {
     color:          brown;
     }
 
+.GPIOTable {
+    font-size:      120%;
+    }
+
+.GPIOValue {
+    height: 1.5em; 
+    }
+
+.NavButton { 
+    max-height:     60px;
+    border:         2px solid black;
+    border-radius:  15px;
+    -moz-border-radius: 15px;
+    }
+
 .NoBotMargin {
     margin-bottom:  0;
-    }
-
-.Unchanged {
-    color:          grey;
-    }
-
-input:disabled {
-    background:     silver;
     }
 
 input {
@@ -43,4 +51,5 @@ input {
     font-family:    helvetica, arial, sans serif;
     padding-left:   0px;
     font-size:      150%;
+    color:          brown;
     }
