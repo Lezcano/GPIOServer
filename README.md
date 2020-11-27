@@ -1,61 +1,69 @@
-# BEING ACTIVERLY WORKED ON. Check back in about a week (Dec 1, 2020) for initial release 
-(this line will be removed).
+# IN DEVELOPMENT. Check back in about a week (Dec 1, 2020) for initial release (this line will be removed).
 
 # GPIOServer: Easy end-user control of RasPi hardware
 
-
-# AppDaemon: Easy end-user configuration for RasPi systems
-
-<table>
+<table style="width: 100%;">
 <tbody>
-<tr><td style="width: 50%"></td><td style="width: 50%"></td></tr>
-<tr><td>
-How does an end-user configure a RasPi product?
+<tr>
+<td>
+Suppose you have a product using the RasPi GPIO connector.<p />
 
-Specifically, if you have a product with an embedded RasPi, how does the user:
-- Enter their WiFi password?
-- Connect to their filesharing workgroup?
-- Set a fixed IP address?
-- Disable Wifi and use ethernet?
-- Choose a name for their system?
+How does your customer control the attached hardware?<p />
 
-Attaching a display and keyboard is a bother, and end users
-might not have a spare display and keyboard laying around.
+For a RasPi relay board, how does the user control the relays when the Pi
+is located in the attic? End-users might not have a spare display and
+keyboard, and a display and keyboard may not be convenient at that location.
 
-This project supplies a way for the end-user to easily configure a RasPi system.
+The GPIOServer presents a web page interface to the RasPi GPIO lines,
+allowing the end user to read inputs and set outputs using any browser.
+The GPIO config is specified by a file (that you supply) that limits the
+user to valid actions.
 
-</td><td>
-<img style="float: right; margin: 0px 0px 10px 10px;" src="https://cdn.hackaday.io/images/1376521605470259149.png">
-</td></tr></tbody></table>
+The project also supplies executables that can control the GPIO system
+directly without a browser. The programs can be used at the command line
+or embeded into scripts as needed.
+</td>
+<td><img style="float: right; margin: 0px;" src="https://cdn.hackaday.io/images/7702931606497840554.png"></td>
+</tr></tbody></table>
 
 ## How it works
 
-The AppDaemon runs your application (your product software)
-at system boot. If your application crashes or hangs,
-the daemon will automatically reboot the system.
+GPIOServer runs on the Raspberry Pi and reads a configuration file
+(that you supply) describing the GPIOs used by the attached hardware:
+the mode (input/output), logic (normal/inverted), hardware name
+("Relay 2"), and so on. The server initializes these GPIOs and
+accepts JSON commands to read and/or set the values.
 
-The "AppDaemon" application also monitors a GPIO button.
-When pressed, the system will stop running your application
-and switch to Access Point mode. It will broadcast an access
-point with the name of the system, when connected to
-that AP the user is presented with a configuration panel to
-set system parameters such as their home WiFi and password.
+The system also spawns a web server with HTML pages showing the
+GPIOs. The web interface lets the user read inputs and set outputs
+using any web browser.
 
-When the user saves the configuration, the system will reboot
-and continue your product application.
+In addition to the web server, the project supplies programs that
+communicate with the server directly. Knowing the IP address of the
+Raspberry Pi system, the user can use these commands to remotely read
+and control GPIO settings without using a browser. The commands can be
+run at the command line, and may be embedded into scripts as needed.
 
-## Monitoring the product application
+## Integrating with your product application
 
-The AppDaemon is given an application to run, and will monitor that application for correct execution. If the
-application crashes, hangs, or exits the AppDaemon reboot the system and rerun the application.
+The system is intended to be used with your hardware product.
 
-The intent is for a high-reliability system where one process is doing something which might hang, crash,
-or otherwise become a problem. When a problem with the application is detected, this daemon will reboot and
-presumably clear the error.
+After installing the project (using "git clone"), simply edit the
+configuration file "GPIO.conf" to specify which GPIOs are presented to
+the user, their mode specifics, and hardware names. Comment out any
+GPIOs that you don't want users to access.
 
-(This program was originally made to monitor cell modem applications, where the cell modem can crash or hang or
-be unusable for myriad reasons, and sometimes even detecting that a problem exists is impossible.)
+Add your product branding to the web pages as needed: background color,
+fonts and styles, trademarks, and corporate logos.
+
+This product is open source and free to use without attribution. Contact
+me through this site if you need a more definitive legal document. (See
+"private messages" at top of page.) 
 
 ## Installing
 
 Installation instructions are in the file "INSTALL.md" supplied with the project.
+
+## Bugs and errors
+
+Please let me know about bugs and other issues so I can update the project.

@@ -13,24 +13,22 @@ once the example application from that project is working.
 
 [AppDaemon on GitHub](https://github.com/ToolChainGang/AppDaemon "AppDaemon on GitHub")
 
-[AppDaemon on Hackaday.io]([AppDaemon on GitHub](https://github.com/ToolChainGang/AppDaemon "AppDaemon on GitHub")
- "AppDaemon on Hackaday.io")
+[AppDaemon on Hackaday.io](https://hackaday.io/project/175543-easy-raspi-configuration "App daemon on Hackaday.io")
 
-
-### Step 2: Copy this project to the /home/pi directory.
+### Step 2: Copy the GPIOServer project to /home/pi.
 
 
 ```
+> cd
 > git clone https://github.com/ToolChainGang/GPIOServer.git
 ```
 
 ### Step 3: Upgrade your system 
 
 The project subdir "install" contains a script to upgrade your system and install needed packages.
-These scripts install extra packages needed for this project, but not installed as part of the
-AppDaemon install process.
+This script installs extra packages for this project not installed as part of the AppDaemon.
 
-For proper installation, each script should be run multiple times, fixing errors as needed until the
+For proper installation, the script should be run multiple times, fixing errors as needed until the
 output contains nothing but a list of "already have most recent version" messages.
 
 ```
@@ -63,7 +61,7 @@ nohup /root/AppDaemon/bin/AppDaemon -v --config-gpio=4 --led-gpio=19  \
 ```
 
 In this example, the GPIOServer will be unable to access GPIOs 4 and 19, since the AppDaemon
-will have already opened them.
+owns them.
 
 ### Step 5: Test your GPIO hardware
 
@@ -82,15 +80,12 @@ gpio read 12        # Read GPIO 12 and display the value
 gpio blink 15       # Blink GPIO 15 on and off continuously, as an LED
 ```
 
-### Step 6: Install into AppDaemon
-
-The AppDaemon is currently running the sample application, it only remains to switch it
-over to running the GPIOServer application.
+### Step 6: Configure AppDaemon to run GPIOServer
 
 Change the /etc/rc.local file so that the AppDaemon invokes the GPIOServer instead of the
 sample application.
 
-For example, put this in your /etc/rc.local file:
+For example, put this at the end your /etc/rc.local file:
 
 ```
 ########################################################################################################################
@@ -133,4 +128,4 @@ that they control your hardware in the correct manner, and so on.
 For example, if your RasPi has IP address 192.168.1.31, enter "http://192.168.1.31/" into the address bar to
 see the GPIOServer pages.
 
-If you have trouble, check out /home/pi/GPIOServer/install/DEBUGGING.txt for hints on how to proceed.
+If you have trouble, check out /home/pi/GPIOServer/install/DEBUGGING.txt for useful information.
