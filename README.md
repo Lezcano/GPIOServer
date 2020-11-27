@@ -23,7 +23,7 @@ The project also supplies executables that can control the GPIO system
 directly without a browser. The programs can be used at the command line
 or embeded into scripts as needed.
 </td>
-<td><img style="float: right; margin: 0px;" src="https://cdn.hackaday.io/images/7702931606497840554.png"></td>
+<td><img style="float: right; margin: 0px;" src="https://cdn.hackaday.io/images/1526101606498751157.png"></td>
 </tr></tbody></table>
 
 ## How it works
