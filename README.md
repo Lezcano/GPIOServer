@@ -1,3 +1,6 @@
+# BEING ACTIVERLY WORKED ON. Check back in about a week (Dec 1, 2020) for initial release 
+(this line will be removed).
+
 # GPIOServer: Easy end-user control of RasPi hardware
 
 
