@@ -1,6 +1,3 @@
-# BEING ACTIVERLY WORKED ON. Check back in about a week (Dec 1, 2020) for initial release 
-(this line will be removed).
-
 # GPIOServer: Easy end-user control of RasPi hardware
 
 ## Installing
@@ -20,17 +17,18 @@ once the example application from that project is working.
  "AppDaemon on Hackaday.io")
 
 
-### Step 1: Copy the project to the /root directory.
+### Step 2: Copy this project to the /home/pi directory.
+
 
 ```
-> sudo su
-> cd /root
-> git clone https://github.com/ToolChainGang/AppDaemon.git
+> git clone https://github.com/ToolChainGang/GPIOServer.git
 ```
 
-### Step 2: Upgrade your system 
+### Step 3: Upgrade your system 
 
-The project subdir "install" contains scripts to upgrade your system and install needed packages.
+The project subdir "install" contains a script to upgrade your system and install needed packages.
+These scripts install extra packages needed for this project, but not installed as part of the
+AppDaemon install process.
 
 For proper installation, each script should be run multiple times, fixing errors as needed until the
 output contains nothing but a list of "already have most recent version" messages.
@@ -38,7 +36,7 @@ output contains nothing but a list of "already have most recent version" message
 ```
 (as root)
 
-> cd /root/AppDaemon/install
+> cd /home/pi/GPIOServer/install
 > ./05-UpgradeInstall.sh
 
 Go get lunch, then rerun the script
@@ -47,50 +45,69 @@ Go get lunch, then rerun the script
 
 Verify that the output contains nothing but a list of "newest version" messages.
 
-> ./06-UpgradePerl.sh
-
-Go get dinner, then rerun the script
-
-> ./06-UpgradePerl.sh
-
-Verify that the output contains nothing but a list of "newest version" messages.
-
 ```
 
-### Step 3: Test your GPIO hardware
+### Step 4: Configure your GPIO hardware
 
-The install directory contains a GPIO testing app using the same logic as the AppDaemon.
+Edit the file "etc/GPIO.conf" and make whatever changes you need to configure your specific
+hardware. The commentary at the top of that file is self-explanatory, and there are several
+example configurations to help get you started.
 
-Execute that app with your GPIO settings and verify that the config button hardware works,
-your LED blinks (if you use a config LED), and so on.
+IMPORTANT: The GPIOs shown by the GPIOServer must *NOT* include the ones used by the AppDaemon!
 
-For example:
+For example, suppose your rc.local contains the following:
 
 ```
-> GPIOTest --config-gpio=4 --led-gpio=19
+nohup /root/AppDaemon/bin/AppDaemon -v --config-gpio=4 --led-gpio=19  \
+                                       --web-dir /home/pi/GPIOServer/public_html
 ```
 
-### Step 4: Install the test application
+In this example, the GPIOServer will be unable to access GPIOs 4 and 19, since the AppDaemon
+will have already opened them.
 
-The install directory contains a sample application (SampleApp) for testing.
+### Step 5: Test your GPIO hardware
 
-Copy that app to the /home/pi directory, change the owner to pi:pi, then add a line to your
-/etc/rc.local file that invokes the AppDaemon with that file.
+The "gpio" system command can be used to test individual bits of your hardware. Use that
+command verify that your input hardware works, your output hardware works, and so on.
+
+Some useful gpio commands are:
+
+```
+gpio -h             # Show usage
+
+gpio readall        # Read and display all GPIO modes and values
+
+gpio read 12        # Read GPIO 12 and display the value
+
+gpio blink 15       # Blink GPIO 15 on and off continuously, as an LED
+```
+
+### Step 6: Install into AppDaemon
+
+The AppDaemon is currently running the sample application, it only remains to switch it
+over to running the GPIOServer application.
+
+Change the /etc/rc.local file so that the AppDaemon invokes the GPIOServer instead of the
+sample application.
 
 For example, put this in your /etc/rc.local file:
 
 ```
 ########################################################################################################################
 #
-# Start the AppDaemon
+# Start the GPIOServer
 #
 set +e
 
 ConfigGPIO=4;       # Config switch WPi07, Connector pin  7, GPIO (command) BCM 04
 LEDGPIO=19;         # Config LED    WPi24, Connector pin 35, GPIO (command) BCM 19
 
-#nohup /root/AppDaemon/bin/AppDaemon   --config-gpio=$ConfigGPIO --led-gpio=$LEDGPIO --user=pi /home/pi/SampleApp &
-nohup /root/AppDaemon/bin/AppDaemon -v --config-gpio=$ConfigGPIO --led-gpio=$LEDGPIO --user=pi /home/pi/SampleApp &
+Verbose="-v"        # AppDaemon gets very talky
+#Verbose=           # AppDaemon shuts up
+
+nohup /root/AppDaemon/bin/AppDaemon $Verbose --config-gpio=$ConfigGPIO --led-gpio=$LEDGPIO  \
+                                             --web-dir /home/pi/GPIOServer/public_html      \
+                                             --user=pi /home/pi/GPIOServer/bin/GPIOServer &
 
 set -e
 ```
@@ -100,16 +117,20 @@ A sample rc.local file that does this is included with the project, so for a qui
 ```
 (as root) 
 
-> cd /root/AppDaemon/install
-> cp SampleApp /home/pi/
-> chown pi:pi /home/pi/SampleApp
+> cd /home/pi/GPIOServer/install
 > cp /etc/rc.local /etc/rc.local.bak
 > cp rc.local.SAMPLE /etc/rc.local
 > reboot
 ```
 
-### Step 5: Connect the AppDaemon to your application
+### Step 5: Verify that everything is running
 
-Once everything is running the /root/AppDaemon/install directory is no longer needed - you can delete it.
+Once everything is running the /home/pi/GPIOServer/install directory is no longer needed - you can delete it.
 
-Change the link in rc.local to run your application instead of the SampleApp, and you're good to go.
+Open a browser and connect to the IP address of your raspberry pi, and verify the GPIOs are displayed correctly,
+that they control your hardware in the correct manner, and so on.
+
+For example, if your RasPi has IP address 192.168.1.31, enter "http://192.168.1.31/" into the address bar to
+see the GPIOServer pages.
+
+If you have trouble, check out /home/pi/GPIOServer/install/DEBUGGING.txt for hints on how to proceed.
