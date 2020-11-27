@@ -49,7 +49,7 @@
     var WindowHeight;
 
     var WebInfo;
-    var OrigWebInfo;
+    var Populated = 0;      // TRUE if web page tables populated from WebInfo
     var SwitchOnSound;
     var SwitchOffSound;
 
@@ -58,7 +58,7 @@
     //
     var ControlTemplate = '                     \
         <tr><td>$UNAME</td>                     \
-            <td><img id="Control$ID" class="GPIOValue" src="images/SwitchOff.png" title="GPIO Value" onclick=ToggleGPIO(this) /></td>    \
+            <td><img id="Control$ID" class="$CLASS" src="images/SwitchOff.png" title="GPIO Value" onclick=ToggleGPIO(this) /></td>    \
             <td>$UDESC</td>                     \
             </tr>';
 
@@ -88,6 +88,8 @@
 
         SwitchOnSound  = new Audio("images/SwitchOn.wav" );
         SwitchOffSound = new Audio("images/SwitchOff.wav");
+
+        Populated = 0;
         ConfigConnect();
         }
 
@@ -115,34 +117,26 @@
                 return;
                 }
 
-//            console.log("Msg: "+Event.data);
+            //
+            // Most messages return a WebInfo struct, which updates the shown values
+            //
+            if( ConfigData["Type"] == "GetWebInfo" ||
+                ConfigData["Type"] == "SetWebInfo" || 
+                ConfigData["Type"] == "ToggleGPIO" ||
+                ConfigData["Type"] == "CycleGPIO"  ) {
+//                console.log("Msg: "+Event.data);
 
-            if( ConfigData["Type"] == "GetWebInfo" ) {
-                WebInfo     = ConfigData.State;
-                OrigWebInfo  = JSON.parse(Event.data).State;     // Deep clone
+                WebInfo = ConfigData.State;
                 console.log(WebInfo);
 
                 SysNameElements = document.getElementsByClassName("SysName");
                 for (i = 0; i < SysNameElements.length; i++) {
-                    SysNameElements[i].innerHTML = OrigWebInfo.SysName;
+                    SysNameElements[i].innerHTML = WebInfo.SysName;
                     };
 
                 PopulateGPIOPages();
                 SetGPIOValues();
                 GotoPage("ControlPage");
-                return;
-                }
-
-            if( ConfigData["Type"] == "ToggleGPIO" ) {
-                console.log(ConfigData);
-                WebInfo = ConfigData.State;
-                SetGPIOValues();
-                return;
-                }
-
-
-            if( ConfigData["Type"] == "SetWebInfo" ) {
-//                console.log(ConfigData);
                 return;
                 }
 
@@ -192,6 +186,16 @@
     // PopulateGPIOPages - Populate the GPIO pages with config info
     //
     function PopulateGPIOPages() {
+
+        //
+        // Don't bother unless something has changed (in which case, var Populated fill be false)
+        //
+        if( Populated ) {
+            return;
+            }
+
+        Populated = 1;
+
         var ValueTable = document.getElementById("GPIOValues");
         ValueTable.innerHTML = OutputText;
 
@@ -208,7 +212,8 @@
             //
             var GPIOEntry = ControlTemplate.replaceAll("$ID"   ,GPIO.ID)
                                            .replaceAll("$UNAME",GPIO.UName)
-                                           .replaceAll("$UDESC",GPIO.UDesc);
+                                           .replaceAll("$UDESC",GPIO.UDesc)
+                                           .replaceAll("$CLASS","GPIOValue Switch");
             ValueTable.innerHTML += GPIOEntry;
 
             var NameEntry = ConfigTemplate.replaceAll("$ID"   ,GPIO.ID)
@@ -231,7 +236,8 @@
             //
             var GPIOEntry = ControlTemplate.replaceAll("$ID"   ,GPIO.ID)
                                            .replaceAll("$UNAME",GPIO.UName)
-                                           .replaceAll("$UDESC",GPIO.UDesc);
+                                           .replaceAll("$UDESC",GPIO.UDesc)
+                                           .replaceAll("$CLASS","GPIOValue LED");
             ValueTable.innerHTML += GPIOEntry;
 
             var NameEntry = ConfigTemplate.replaceAll("$ID"   ,GPIO.ID)
@@ -291,5 +297,13 @@
     // ChangeGPIONames - Change the GPIO user names (and comments)
     //
     function ChangeGPIONames() {
+
+        WebInfo.GPIOInfo.forEach(function (GPIO) { 
+            GPIO.UName = document.getElementById("UName" + GPIO.ID).value;
+            GPIO.UDesc = document.getElementById("UDesc" + GPIO.ID).value;
+            });
+
+        Populated = 0;
+        ServerCommand("SetWebInfo",WebInfo);
         GotoPage("ControlPage");
         }

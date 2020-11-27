@@ -51,6 +51,8 @@
 ##          ->{$Section}                Named section
 ##              ->{$Var}=>$Value        Value of variable in section
 ##
+##      ->FromHash() => {}              Change original values to new ones
+##
 ##      ->AddLines($Line,@Lines...)     Add more lines to file
 ##
 ##      ->CommentLine($LineNo,$Type)        Comment out a line, using supplied function
@@ -62,6 +64,14 @@
 ##      ->SaveFile($Filename)           Save modified file
 ##
 ##  NOTE: The special section "Global" contains variables not otherwise in a section.
+##
+##  NOTE: Blank values set by the user (such as "FromHash()") are appended to the end of the line.
+##          For example, if the line "Name=" will be parsed with a value of blank, but when setting
+##          a new value "John" the system won't know where the original value was. In this case the
+##          parser will append the new value to the end of the line "Name=John", which is most
+##          likely what the user wanted.
+##
+##        In these cases, putting an inline comment in the definition will not do the right thing.
 ##
 ########################################################################################################################
 ########################################################################################################################
@@ -469,7 +479,12 @@ sub Update {
             next
                 unless $Var->{NewValue} ne $Var->{Value};
 
-            $self->{Lines}[$Var->{LineNo}] =~ s/\Q$Var->{Value}\E/\Q$Var->{NewValue}\E/g;
+            #
+            # If the original value was blank, a simple substitution won't work. In that case, append the new
+            #   value to the end of the line
+            #
+            if( $Var->{Value} eq "" ) { $self->{Lines}[$Var->{LineNo}] .= $Var->{NewValue};                           }
+            else                      { $self->{Lines}[$Var->{LineNo}] =~ s/\Q$Var->{Value}\E/\Q$Var->{NewValue}\E/g; }
 
             $self->{Changed} = 1;
             }

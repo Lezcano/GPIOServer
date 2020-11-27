@@ -33,6 +33,12 @@ body {
     height: 1.5em; 
     }
 
+.LED { 
+    border:         2px solid black;
+    border-radius:  5px;
+    -moz-border-radius: 3px;
+    }
+
 .NavButton { 
     max-height:     60px;
     border:         2px solid black;
