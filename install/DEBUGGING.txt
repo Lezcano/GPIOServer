@@ -1,14 +1,6 @@
 ########################################################################################################################
 #
-# The GPIOTest program (included in this directory) uses the same GPIO logic as the AppDaemon, but
-#   without any other actions (such as taking down the net interface).
-#
-# Use it to verify your hardware settings before modifying /etc/rc.local
-#
-./GPIOTest --config-gpio=22 --led-gpio=21
-
-#
-# NOTE: The system uses the WiringPi numbering scheme for GPIOs!!!
+# The system uses the WiringPi numbering scheme for GPIOs
 #
 # The following table outlines the COMPLETELY FRUSTRATING numbering schemes used on
 #   the RasPi. Use the wPi column numbering for the command GPIO numbers.
@@ -43,27 +35,9 @@
 
 ########################################################################################################################
 #
-# The following commands will run the configuration process outright, without having to press the GPIO
-#   or take down the interfaces. This allows you to debug the config system over ssh.
+# If a remote user is logged into the system via ssh, the AppDaemon will not reboot the system
+#   when the application ends (on the assumption that a remote user is debugging the system).
 #
-# From ssh:
+# Thus, if you need to debug the server for any reason, it's sufficient to remote login using ssh,
+#   kill the GPIOServer process, and rerun it manually from the command line.
 #
-killall /usr/bin/perl
-cd /root/AppDaemon/public_html
-python2 -m HTTPServer 80               &
-/root/AppDaemon/bin/ConfigServer -r -v &
-
-#
-# The "-r" option to the ConfigServer means it will not reboot after save
-#
-
-
-########################################################################################################################
-#
-# The following command will periodically scan and print out AP ESSID's
-#
-# Run this from a command prompt on your laptop to continuously scan for APs while
-#   debugging the AppDaemon
-#
-watch -n5 "iwlist wlan0 scan | grep -i ESSID"
-

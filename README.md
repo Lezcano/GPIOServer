@@ -6,7 +6,7 @@
 <tbody>
 <tr>
 <td>
-Suppose you have a product using the RasPi GPIO connector.<p />
+Suppose you sell a product using the RasPi GPIO connector.<p />
 
 How does your customer control the attached hardware?<p />
 
@@ -16,10 +16,10 @@ keyboard, and a display and keyboard may not be convenient at that location.
 
 The GPIOServer presents a web page interface to the RasPi GPIO lines,
 allowing the end user to read inputs and set outputs using any browser.
-The GPIO config is specified by a file (that you supply) that limits the
+The GPIO config is specified by a file (that you supply) limiting the
 user to valid actions.
 
-The project also supplies executables that can control the GPIO system
+The project also supplies executables to control the GPIO system
 directly without a browser. The programs can be used at the command line
 or embeded into scripts as needed.
 </td>
@@ -39,10 +39,10 @@ GPIOs. The web interface lets the user read inputs and set outputs
 using any web browser.
 
 In addition to the web server, the project supplies programs that
-communicate with the server directly. Knowing the IP address of the
-Raspberry Pi system, the user can use these commands to remotely read
-and control GPIO settings without using a browser. The commands can be
-run at the command line, and may be embedded into scripts as needed.
+communicate with the server directly. The user can use these commands
+to remotely read and control GPIO settings without using a browser.
+The commands can be run at the command line, and may be embedded
+into scripts as needed.
 
 ## Integrating with your product application
 
@@ -57,8 +57,7 @@ Add your product branding to the web pages as needed: background color,
 fonts and styles, trademarks, and corporate logos.
 
 This product is open source and free to use without attribution. Contact
-me through this site if you need a more definitive legal document. (See
-"private messages" at top of page.) 
+me through this site if you need a more definitive legal document.
 
 ## Installing
 

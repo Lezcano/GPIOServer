@@ -8,8 +8,8 @@ to modify for your needs.
 
 ### Step 1: Install AppDaemon
 
-Install the "AppDaemon" project, per instructions found in that project. Continue with the next step
-once the example application from that project is working.
+Install the "AppDaemon" project, per that project's instructions. Continue with the next step
+once the AppDaemon example application is working.
 
 [AppDaemon on GitHub](https://github.com/ToolChainGang/AppDaemon "AppDaemon on GitHub")
 
@@ -25,11 +25,11 @@ once the example application from that project is working.
 
 ### Step 3: Upgrade your system 
 
-The project subdir "install" contains a script to upgrade your system and install needed packages.
-This script installs extra packages for this project not installed as part of the AppDaemon.
+The project subdir "install" contains a script to upgrade your system and install extra packages
+which are not installed as part of the AppDaemon project.
 
 For proper installation, the script should be run multiple times, fixing errors as needed until the
-output contains nothing but a list of "already have most recent version" messages.
+output contains nothing but a list of "already most recent version" messages.
 
 ```
 (as root)
@@ -47,11 +47,11 @@ Verify that the output contains nothing but a list of "newest version" messages.
 
 ### Step 4: Configure your GPIO hardware
 
-Edit the file "etc/GPIO.conf" and make whatever changes you need to configure your specific
-hardware. The commentary at the top of that file is self-explanatory, and there are several
-example configurations to help get you started.
+Edit the file "etc/GPIO.conf" and describe your specific GPIO hardware.
+The commentary at the top of that file is self-explanatory, and there are
+example configurations to help you get started.
 
-IMPORTANT: The GPIOs shown by the GPIOServer must *NOT* include the ones used by the AppDaemon!
+The GPIOs shown by the GPIOServer must *NOT* include the ones used by the AppDaemon!
 
 For example, suppose your rc.local contains the following:
 
@@ -65,8 +65,8 @@ owns them.
 
 ### Step 5: Test your GPIO hardware
 
-The "gpio" system command can be used to test individual bits of your hardware. Use that
-command verify that your input hardware works, your output hardware works, and so on.
+Use the "gpio" system command to test individual your hardware. Verify that your input
+hardware works, your output hardware works, and so on.
 
 Some useful gpio commands are:
 
@@ -79,6 +79,11 @@ gpio read 12        # Read GPIO 12 and display the value
 
 gpio blink 15       # Blink GPIO 15 on and off continuously, as an LED
 ```
+
+The GPIOServer uses the "WiringPi" numbering system. From the "gpio readall" command,
+use the numbers shown below the "wPi" columns. For example, per the "gpio readall"
+listing, a device connected to physical pin 11 on the connector is described as
+GPIO 0.
 
 ### Step 6: Configure AppDaemon to run GPIOServer
 
@@ -94,8 +99,8 @@ For example, put this at the end your /etc/rc.local file:
 #
 set +e
 
-ConfigGPIO=4;       # Config switch WPi07, Connector pin  7, GPIO (command) BCM 04
-LEDGPIO=19;         # Config LED    WPi24, Connector pin 35, GPIO (command) BCM 19
+ConfigGPIO=7;       # Config switch WPi07, Connector pin  7, BCM 04
+LEDGPIO=24;         # Config LED    WPi24, Connector pin 35, BCM 19
 
 Verbose="-v"        # AppDaemon gets very talky
 #Verbose=           # AppDaemon shuts up
@@ -120,8 +125,6 @@ A sample rc.local file that does this is included with the project, so for a qui
 
 ### Step 5: Verify that everything is running
 
-Once everything is running the /home/pi/GPIOServer/install directory is no longer needed - you can delete it.
-
 Open a browser and connect to the IP address of your raspberry pi, and verify the GPIOs are displayed correctly,
 that they control your hardware in the correct manner, and so on.
 
@@ -129,3 +132,5 @@ For example, if your RasPi has IP address 192.168.1.31, enter "http://192.168.1.
 see the GPIOServer pages.
 
 If you have trouble, check out /home/pi/GPIOServer/install/DEBUGGING.txt for useful information.
+
+Once everything is running the /home/pi/GPIOServer/install directory is no longer needed - you can delete it.
