@@ -25,10 +25,10 @@ once the AppDaemon example application is working.
 
 ### Step 3: Upgrade your system 
 
-The project subdir "install" contains a script to upgrade your system and install extra packages
+The project subdir "install" contains scripts to upgrade your system and install extra packages
 which are not installed as part of the AppDaemon project.
 
-For proper installation, the script should be run multiple times, fixing errors as needed until the
+For proper installation, each script should be run multiple times, fixing errors as needed until the
 output contains nothing but a list of "already most recent version" messages.
 
 ```
@@ -43,15 +43,22 @@ Go get lunch, then rerun the script
 
 Verify that the output contains nothing but a list of "newest version" messages.
 
+> ./06-UpgradePerl.sh
+
+Go get dinner, then rerun the script
+
+> ./06-UpgradePerl.sh
+
+Verify that the output contains nothing but a list of "newest version" messages.
 ```
 
 ### Step 4: Configure your GPIO hardware
 
-Edit the file "etc/GPIO.conf" and describe your specific GPIO hardware.
+Edit the file "etc/GPIO.conf" to describe your specific GPIO hardware.
 The commentary at the top of that file is self-explanatory, and there are
 example configurations to help you get started.
 
-The GPIOs shown by the GPIOServer must *NOT* include the ones used by the AppDaemon!
+The GPIOs shown by the GPIOServer shouldt *NOT* include the ones used by the AppDaemon!
 
 For example, suppose your rc.local contains the following:
 
@@ -65,10 +72,20 @@ owns them.
 
 ### Step 5: Test your GPIO hardware
 
-Use the "gpio" system command to test individual your hardware. Verify that your input
-hardware works, your output hardware works, and so on.
+The install directory contains a testing app that uses the same GPIO numbering logic
+as the GPIOServer. Execute that app with your GPIO settings and verify that the inputs
+can be read, the outputs can be controlled, and so on.
 
-Some useful gpio commands are:
+For example, the following command will flash (blink on-and-off) GPIO19, and read
+(and print) the values of GPIO4:
+
+```
+> GPIOTest --flash-gpio=19 --read-gpio=4
+```
+
+You can also use the "gpio" system command to test your hardware. Verify that
+your input hardware works, your output hardware works, and so on. Some useful
+gpio commands are:
 
 ```
 gpio -h             # Show usage
@@ -80,11 +97,6 @@ gpio read 12        # Read GPIO 12 and display the value
 gpio blink 15       # Blink GPIO 15 on and off continuously, as an LED
 ```
 
-The GPIOServer uses the "WiringPi" numbering system. From the "gpio readall" command,
-use the numbers shown below the "wPi" columns. For example, per the "gpio readall"
-listing, a device connected to physical pin 11 on the connector is described as
-GPIO 0.
-
 ### Step 6: Configure AppDaemon to run GPIOServer
 
 Change the /etc/rc.local file so that the AppDaemon invokes the GPIOServer instead of the
@@ -93,7 +105,7 @@ sample application.
 For example, put this at the end your /etc/rc.local file:
 
 ```
-########################################################################################################################
+############################################################################################################
 #
 # Start the GPIOServer
 #
@@ -130,6 +142,17 @@ that they control your hardware in the correct manner, and so on.
 
 For example, if your RasPi has IP address 192.168.1.31, enter "http://192.168.1.31/" into the address bar to
 see the GPIOServer pages.
+
+Use the command program to connect to the IP address of your raspberry pi and verify that it can control
+the GPIOs in your system. For example, if your RasPi has IP address 192.168.1.31, from a different RasPi
+enter something like the following:
+
+```
+> GPIOControl.pl --host=192.168.1.31 ToggleGPIO 12
+```
+
+Assuming GPIO 12 is configured as an output to your system, the toggle command should switch the
+output state: "Off" becomes "On", and "On" becomes "Off". 
 
 If you have trouble, check out /home/pi/GPIOServer/install/DEBUGGING.txt for useful information.
 

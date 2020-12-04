@@ -1,4 +1,4 @@
-# IN DEVELOPMENT. Check back in about a week (Dec 1, 2020) for initial release (this line will be removed).
+# IN DEVELOPMENT. Check back in about a week (Dec 7, 2020) for initial release (this line will be removed).
 
 # GPIOServer: Easy end-user control of RasPi hardware
 
@@ -19,9 +19,10 @@ allowing the end user to read inputs and set outputs using any browser.
 The GPIO config is specified by a file (that you supply) limiting the
 user to valid actions.
 
-The project also supplies executables to control the GPIO system
-directly without a browser. The programs can be used at the command line
-or embeded into scripts as needed.
+The project also supplies an executable to control the GPIO system
+directly without a browser. The program can be used at the command line
+or embeded into scripts as needed. It can be compiled to run on linux,
+windows, or IOS systems.
 </td>
 <td><img style="float: right; margin: 0px;" src="https://cdn.hackaday.io/images/1526101606498751157.png"></td>
 </tr></tbody></table>
@@ -34,22 +35,22 @@ the mode (input/output), logic (normal/inverted), hardware name
 ("Relay 2"), and so on. The server initializes these GPIOs and
 accepts JSON commands to read and/or set the values.
 
-The system also spawns a web server with HTML pages showing the
-GPIOs. The web interface lets the user read inputs and set outputs
-using any web browser.
+The project contains an executable (GPIOControl) to communicate
+with the server from an external host. The user can use
+this program to remotely read and control GPIO settings without
+a browser. The program can be run at the command line, and may be
+embedded into scripts as needed.
 
-In addition to the web server, the project supplies programs that
-communicate with the server directly. The user can use these commands
-to remotely read and control GPIO settings without using a browser.
-The commands can be run at the command line, and may be embedded
-into scripts as needed.
+The system also spawns a web server with HTML pages showing the
+GPIOs. The web interface allows the user read inputs and set outputs
+using any web browser.
 
 ## Integrating with your product application
 
 The system is intended to be used with your hardware product.
 
 After installing the project (using "git clone"), simply edit the
-configuration file "GPIO.conf" to specify which GPIOs are presented to
+configuration file "GPIO.conf" to specify which GPIOs are available to
 the user, their mode specifics, and hardware names. Comment out any
 GPIOs that you don't want users to access.
 
