@@ -1,0 +1,297 @@
+#!/usr/bin/perl
+#
+########################################################################################################################
+########################################################################################################################
+##
+##      Copyright (C) 2020 Peter Walsh, Milford, NH 03055
+##      All Rights Reserved under the MIT license as outlined below.
+##
+##  FILE
+##
+##      GPIOTest
+##
+##  DESCRIPTION
+##
+##      Test the GPIO settings
+##
+##      This uses the same GPIO logic as the AppDaemon, and will print out changes to the button interface
+##        and flash the LED but won't start the AP or change the network settings.
+##
+##  USAGE
+##
+##      GPIOTest --flash-gpio=<gpio#> --read-gpio=<gpio#>
+##
+##      where:
+##
+##          --flash-gpio=#          GPIO to output on and off (1-sec interval)
+##
+##          --read-gpio=#           GPIO of input to read and display (ie - button or switch)
+##
+##          If either argument is not given, that function will not be attempted.
+##
+########################################################################################################################
+########################################################################################################################
+##
+##  MIT LICENSE
+##
+##  Permission is hereby granted, free of charge, to any person obtaining a copy of
+##    this software and associated documentation files (the "Software"), to deal in
+##    the Software without restriction, including without limitation the rights to
+##    use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+##    of the Software, and to permit persons to whom the Software is furnished to do
+##    so, subject to the following conditions:
+##
+##  The above copyright notice and this permission notice shall be included in
+##    all copies or substantial portions of the Software.
+##
+##  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+##    INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+##    PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+##    HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+##    OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+##    SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+##
+########################################################################################################################
+########################################################################################################################
+
+use strict;
+use warnings;
+use Carp;
+
+use RPi::Pin;
+use RPi::Const qw(:all);
+
+########################################################################################################################
+########################################################################################################################
+##
+## Data declarations
+##
+########################################################################################################################
+########################################################################################################################
+
+my $FlashGPIO = -1;     # LED    to flash
+my $ReadGPIO  = -1;     # Button to read
+
+my $Flash;
+my $Read;
+
+my $ReadState  = 0;
+my $FlashState = 0;
+
+$| = 1;                 # Flush output immediately
+
+########################################################################################################################
+########################################################################################################################
+##
+## Command line
+##
+##      GPIOTest [-v] --config-gpio=<gpio#> --led-gpio=<gpio#>
+##
+########################################################################################################################
+########################################################################################################################
+
+ParseCommandLine("flash-gpio=i" => \$FlashGPIO,
+                 "read-gpio=i"  => \$ReadGPIO);
+
+if( $FlashGPIO >= 0 ) {
+    $Flash = RPi::Pin->new($FlashGPIO);
+    $Flash->mode(OUTPUT);
+    $Flash->write(LOW);
+    }
+
+if( $ReadGPIO >= 0 ) {
+    $Read = RPi::Pin->new($ReadGPIO);
+    $Read->mode(INPUT);
+    $Read->pull(PUD_UP);
+    }
+
+########################################################################################################################
+########################################################################################################################
+##
+## GPIOTest
+##
+########################################################################################################################
+########################################################################################################################
+
+#
+# The -v option prints out debug information
+#
+Message("GPIOTest is up and running.");
+Message("Using FlashGPIO: $FlashGPIO");
+Message("Using ReadGPIO : $ReadGPIO");
+
+if( $FlashGPIO < 0 and $ReadGPIO < 0 ) {
+    Message("Nothing to do");
+    exit(0);
+    }
+
+Message("State: IDLE");
+
+########################################################################################################################
+########################################################################################################################
+#
+# At this point, everything should be working. Keep checking for the config switch and flashing the output
+#
+while(1) {
+
+    if( $ReadGPIO >= 0 ) {
+        my $State = $Read->read();
+
+        if( $State != $ReadState ) {
+            Message("Read: $State");
+            $ReadState = $State;
+            }
+        }
+
+    if( $FlashGPIO >= 0 ) {
+        $FlashState = 1 - $FlashState;
+        $Flash->write($FlashState);
+        Message("Flash: $FlashState");
+        }
+
+    sleep 1;
+    }
+
+
+########################################################################################################################
+########################################################################################################################
+##
+## Message - Show message to the user
+##
+## Inputs:      Msg        Message to print
+##              Fail       If message indicates a failure, (==1) print in Red, else (==0) print in Green
+##
+## Outputs:  None.
+##
+sub Message {
+    my $Msg  = shift;
+
+    print "**** GPIOTest: $Msg\n";
+    }
+
+
+########################################################################################################################
+########################################################################################################################
+#
+# ParseCommandLine - Parse the program command line, using Getopt::Long
+#
+# Inputs:   [Ref to] %Args var for results
+#           String of Getopt::Long parameters to include
+#
+# Outputs:  None.
+#
+# NOTE:     Prints help message and calls exit() if command args can't be parsed.
+#
+sub ParseCommandLine {
+
+#    print "Args: $_\n"
+#        foreach @ARGV;
+
+    if( defined $_[0] and ref $_[0] eq "HASH" ) {
+        my $Args = shift;
+
+        exit HELP_MESSAGE()
+            unless GetOptions($Args,"h|help","version",@_);
+
+        exit HELP_MESSAGE()
+            if $Args->{h};
+
+        exit VERSION_MESSAGE()
+            if $Args->{v};
+        }
+    else {
+        my $Help = 0;
+        my $Vers = 0;
+
+        exit HELP_MESSAGE()
+            unless GetOptions("h|help" => \$Help,"version" => \$Vers, @_);
+
+        exit HELP_MESSAGE()
+            if $Help;
+
+        exit VERSION_MESSAGE()
+            if $Vers;
+        }
+    }
+
+
+########################################################################################################################
+########################################################################################################################
+#
+# HELP_MESSAGE - Print out help information
+#
+# Inputs:   None.
+#
+# Outputs:  Zero
+#
+sub HELP_MESSAGE {
+
+    #
+    # Print the text in the preamble of the script (at the top of the main file) 
+    #   for the help message.
+    #
+    my @Usage = read_file("$Bin/$RealScript");
+
+    shift @Usage
+        until $Usage[0] =~ /USAGE/;
+
+    shift @Usage;           # Skip USAGE line
+
+    #
+    # Print everything between the "Usage" line and the subsequent "Example" line.
+    #   If no "Example" line is found, terminate at the comment barrier.
+    #
+    print "\n";
+    print "Usage: ";
+    while(1) {
+        my $Line = shift @Usage;
+
+        last
+            if $Line =~ /EXAMPLE/;
+
+        last
+            if $Line =~ /###/;
+
+        $Line =~ s/\#\#//;
+
+        print $Line;
+        }
+
+    return 0;
+    }
+
+
+########################################################################################################################
+########################################################################################################################
+#
+# VERSION_MESSAGE - Print out current module version
+#
+# Inputs:   None.
+#
+# Outputs:  Zero.
+#
+sub VERSION_MESSAGE {
+
+    #
+    # Print the text in the preamble of the script (at the top of the main file) 
+    #   for the help message.
+    #
+    # By rights, the version definition should be the first line that matches
+    #
+    my @VersionLines = grep { $_ =~ /\$VERSION/; } read_file("$Bin/$RealScript");
+
+    my $Version = $VersionLines[0] // "Unknown";
+
+    #
+    # Strip the perl syntax for better looking output
+    #
+    $Version =~ s/.* = //;
+    $Version =~ s/;.*//;
+    $Version =~ s/\'//g;
+    $Version =~ s/\"//g;
+
+    print "\n";
+    print basename($0) . " version $Version\n";
+
+    return 0;
+    }

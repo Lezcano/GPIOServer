@@ -28,7 +28,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 //
-//      WebInfo->
+//      GPIOInfo->
 //          {GPIOInfo}->[]
 //              {UName}-> "Keurig",                         # User assigned name
 //              {UDesc}-> "Coffee maker in the kitchen"     # User assigned comment
@@ -48,8 +48,9 @@
     var WindowWidth;
     var WindowHeight;
 
-    var WebInfo;
-    var Populated = 0;      // TRUE if web page tables populated from WebInfo
+    var GPIOInfo;
+    var PrevGPIOInfo;
+    var Populated = 0;      // TRUE if web page tables populated from GPIOInfo
     var SwitchOnSound;
     var SwitchOffSound;
 
@@ -94,7 +95,7 @@
         }
 
     //
-    // Send a command to the web page
+    // Send a command to the server
     //
     function ServerCommand(Command,Arg1,Arg2,Arg3) {
         ConfigSocket.send(JSON.stringify({
@@ -118,20 +119,20 @@
                 }
 
             //
-            // Most messages return a WebInfo struct, which updates the shown values
+            // Most messages return a GPIOInfo struct, which updates the shown values
             //
-            if( ConfigData["Type"] == "GetWebInfo" ||
-                ConfigData["Type"] == "SetWebInfo" || 
-                ConfigData["Type"] == "ToggleGPIO" ||
-                ConfigData["Type"] == "CycleGPIO"  ) {
+            if( ConfigData["Type"] == "GetGPIOInfo" ||
+                ConfigData["Type"] == "SetGPIOInfo" || 
+                ConfigData["Type"] == "ToggleGPIO"  ||
+                ConfigData["Type"] == "CycleGPIO"   ) {
 //                console.log("Msg: "+Event.data);
 
-                WebInfo = ConfigData.State;
-                console.log(WebInfo);
+                GPIOInfo = ConfigData.State;
+//                console.log(GPIOInfo);
 
                 SysNameElements = document.getElementsByClassName("SysName");
                 for (i = 0; i < SysNameElements.length; i++) {
-                    SysNameElements[i].innerHTML = WebInfo.SysName;
+                    SysNameElements[i].innerHTML = GPIOInfo.SysName;
                     };
 
                 PopulateGPIOPages();
@@ -148,7 +149,7 @@
             };
 
         ConfigSocket.onopen = function(Event) {
-            ServerCommand("GetWebInfo");
+            ServerCommand("GetGPIOInfo");
             }
         };
 
@@ -202,7 +203,7 @@
         var NamesTable = document.getElementById("GPIONames");
         NamesTable.innerHTML = OutputText;
 
-        WebInfo.GPIOInfo.forEach(function (GPIO) { 
+        GPIOInfo.GPIOInfo.forEach(function (GPIO) { 
 
             if( GPIO.Mode == "Input" )
                 return;
@@ -226,7 +227,7 @@
         ValueTable.innerHTML += InputText;
         NamesTable.innerHTML += InputText;
 
-        WebInfo.GPIOInfo.forEach(function (GPIO) { 
+        GPIOInfo.GPIOInfo.forEach(function (GPIO) { 
 
             if( GPIO.Mode == "Output" )
                 return;
@@ -245,12 +246,14 @@
                                           .replaceAll("$UDESC",GPIO.UDesc)
                                           .replaceAll("$HNAME",GPIO.HName);
             NamesTable.innerHTML += NameEntry;
+
+            PrevGPIOInfo = GPIOInfo;
             });
 
         //
         // See if user is allowed to rename GPIOs
         //
-        if( WebInfo.AllowRename == "No" ) {
+        if( GPIOInfo.AllowRename == "No" ) {
             document.getElementById("ConfigButton").style.display = "none";
             }
         }
@@ -264,13 +267,22 @@
         ValueElements = document.getElementsByClassName("GPIOValue");
 
         for (i = 0; i < ValueElements.length; i++) {
-            var Image  = ValueElements[i];
-            var GPIOID = Image.id.replace('Control','').replace('Config','');
-            var GPIO   = WebInfo.GPIOInfo.find(function (GPIO) { return GPIO.ID == GPIOID; });
+            var Image    = ValueElements[i];
+            var GPIOID   = Image.id.replace('Control','').replace('Config','');
+            var GPIO     =     GPIOInfo.GPIOInfo.find(function (GPIO) { return GPIO.ID == GPIOID; });
+            var PrevGPIO = PrevGPIOInfo.GPIOInfo.find(function (GPIO) { return GPIO.ID == GPIOID; });
 
             if( GPIO.Mode == "Input" ) { Image.src  = "images/LED"    + GPIO.Value + ".png"; }
-            else                       { Image.src  = "images/Switch" + GPIO.Value + ".png"; }
+            else                       { 
+                if( GPIO.Value != PrevGPIO.Value ) {
+                    if( GPIO.Value == "On" ) { SwitchOffSound.play(); }
+                    else                     { SwitchOnSound.play();  }
+                    }
+                Image.src  = "images/Switch" + GPIO.Value + ".png";
+                }
             };
+
+        PrevGPIOInfo = GPIOInfo;
         }
 
 
@@ -280,16 +292,13 @@
     //
     function ToggleGPIO(Element) {
         var GPIOID = Element.id.replace('Control','').replace('Config','');
-        var GPIO   = WebInfo.GPIOInfo.find(function (GPIO) { return GPIO.ID == GPIOID; });
+        var GPIO   = GPIOInfo.GPIOInfo.find(function (GPIO) { return GPIO.ID == GPIOID; });
 
         if( GPIO.Mode == "Input" ) {
             return;
             }
 
         ServerCommand("ToggleGPIO",GPIOID);
-
-        if( GPIO.Value == "On" ) { SwitchOffSound.play(); }
-        else                     { SwitchOnSound.play();  }
         }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -298,12 +307,12 @@
     //
     function ChangeGPIONames() {
 
-        WebInfo.GPIOInfo.forEach(function (GPIO) { 
+        GPIOInfo.GPIOInfo.forEach(function (GPIO) { 
             GPIO.UName = document.getElementById("UName" + GPIO.ID).value;
             GPIO.UDesc = document.getElementById("UDesc" + GPIO.ID).value;
             });
 
         Populated = 0;
-        ServerCommand("SetWebInfo",WebInfo);
+        ServerCommand("SetGPIOInfo",GPIOInfo);
         GotoPage("ControlPage");
         }

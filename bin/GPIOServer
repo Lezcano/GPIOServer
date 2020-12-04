@@ -22,15 +22,49 @@
 ##
 ##      where:      -v      Verbose: print out things as they happen
 ##
-##      $GPIOConfig->
-##          {GPIO#}->'5'
-##              {Mode }->Input          # One of:   Input   Output
-##              {Logic}->Invert         #           Invert  Normal
-##              {Pull }->High           #           High    Low
-##              {Boot }->Low            # Value to take at bootup
-##              {HName}->"Relay 1"      # Hardware name
-##              {UName}->"Keurig"       # User's   assigned name
-##              {UDesc}->"Coffee maker in the kitchen"
+##      Available commands:
+##
+##      ListCommands        => Array of available commands (this list)
+##      GetGPIOInfo         => Return GPIOInfo struct of info
+##      SetGPIOInfo         => Accept new GPIOInfo struct and change names
+##      ToggleGPIO  GPIO#   => Change the state of one GPIO to opposite state
+##      SetGPIO     GPIO#   => Set    the state of one GPIO to specific value
+##      CycleGPIO   GPIO#   => Turn one GPIO off, wait, then turn ON again
+##      ReadGPIO            => Read all GPIO values (synonym for GetGPIOInfo)
+##
+##      Examples:
+##
+##          ToggleGPIO 7        Change state of GPIO 7: if Off, becomes On. If On, becomes Off
+##
+##          CucleGPIO  10       Will turn 10 Off, wait a while, then on again
+##
+########################################################################################################################
+########################################################################################################################
+##
+##      $GPIOInfo   contains information for user consumption: UName, UDesc, Value, and so on.
+##
+##      $GPIOInfo->{GPIOInfo}->[]
+##          {UName} -> "Keurig",                         # User assigned name
+##          {UDesc} -> "Coffee maker in the kitchen"     # User assigned comment
+##          {HName} -> "Relay 1"                         # Hardware name
+##          {Mode}  -> [ 'Input', 'Output' ],
+##          {Value} -> [    'On',    'Off' ],            # Current value
+##          {ID}                                         # (unused by web page)
+##
+##      $GPIOConfig contains full information about the GPIO, including the opened device, mode, 
+##                    logic, and so on.
+##
+##      $GPIOConfig->{GPIO}             # GPIO number, ie "5"
+##          {UName}  -> "Keurig",                         # User assigned name
+##          {UDesc}  -> "Coffee maker in the kitchen"     # User assigned comment
+##          {HName}  -> "Relay 1"                         # Hardware name
+##          { Mode}  -> [  "Input", "Output" ],
+##          {Logic}  -> [ "Normal", "Invert" ],
+##          { Boot}  -> [    "Off",     "On" ],
+##          { Pull}  -> [  "None", "Low", "High" ],
+##          {Device} -> (opened GPIO device)
+##
+##      "Value" and "ID" only exist in the Info struct.
 ##
 ##      The logic will convert keywords to camel case; thus, it is sufficient to
 ##        say things like "if $GPIO->{Logic} eq "Invert" and expect an exact match.
@@ -92,10 +126,9 @@ our $SERVER_PORT = 2021;
 
 our $CycleDefaultMS = 6000;     # 6 seconds wait when power cycling
 
-our $Server;
 our $SysName;
 our $GPIOConfig;        # Full description of GPIO block
-our $WebInfo;           # Info given to web page
+our $GPIOInfo;          # Info given to web page
 
 our $NoError = "No error.";
 
@@ -147,11 +180,11 @@ my $Verbose = 0;
 $Verbose = 1
     if defined $ARGV[0] and $ARGV[0] eq "-v";
 
-$GPIOConfig = GetGPIOConfig();
+GetGPIOConfig();
 $SysName    = GetHostname();
-$WebInfo    = GetWebInfo();
+$GPIOInfo   = GetGPIOInfo();
 
-# print Data::Dumper->Dump([$WebInfo],["WebInfo"]);
+# print Data::Dumper->Dump([$GPIOInfo],["GPIOInfo"]);
 # exit(0);
 
 ########################################################################################################################
@@ -196,17 +229,16 @@ sub ConnectionRequest {
 #
 # Inputs:      None.
 #
-# Outputs:     None. Connected clients are sent a new WebInfo struct
+# Outputs:     None. Connected clients are sent a new GPIOInfo struct
 #
 sub PinChange {
-
-//    return
-//        unless defined $Server;
 
     Message("**** GPIOServer: PinChange!");
 
     GetGPIOValues();
-    my $Request = { Type => "GetWebInfo", State => $WebInfo, Error => $NoError };
+    my $Request = { Type => "GetGPIOInfo", State => $GPIOInfo, Error => $NoError };
+
+    my $Server = GetServer();
 
     SendResponse($_,$Request)
         for $Server->connections();
@@ -251,26 +283,45 @@ sub WebRequest {
         unless length $Request->{Type};
 
     #
-    # GetWebInfo - Return the web GPIO information
+    # ListCommands - Return list of available server commands
     #
-    if( $Request->{Type} eq "GetWebInfo" ) {
+    if( $Request->{Type} eq "ListCommands" ) {
         $Request->{Error} = $NoError;
-        Message("**** GPIOServer: GetWebInfo()")
+        Message("**** GPIOServer: ListCommands()")
+            if $Verbose;
+        $Request->{State} = [ "ListCommands", 
+                              "GetGPIOInfo",  
+                              "SetGPIOInfo",
+                              "ToggleGPIO",
+                              "SetGPIO",
+                              "CycleGPIO",
+                              "ReadGPIO" ];
+        SendResponse($Conn,$Request);
+        return;
+        }
+
+    #
+    # GetGPIOInfo - Return the GPIO information
+    #
+    if( $Request->{Type} eq "GetGPIOInfo" or
+        $Request->{Type} eq "ReadGPIO"  ) {
+        $Request->{Error} = $NoError;
+        Message("**** GPIOServer: GetGPIOInfo()")
             if $Verbose;
         #
-        # Getting values and returning $WebState is the default (see below)
+        # Getting values and returning $GPIOInfo is the default (see below)
         #
         }
 
     #
-    # SetWebInfo - Implement new GPIO user name and comment
+    # SetGPIOInfo - Implement new GPIO user name and comment
     #
-    elsif( $Request->{Type} eq "SetWebInfo" ) {
+    elsif( $Request->{Type} eq "SetGPIOInfo" ) {
         $Request->{Error} = $NoError;
-        Message("**** GPIOServer: SetWebInfo()")
+        Message("**** GPIOServer: SetGPIOInfo()")
             if $Verbose;
-        $Request->{Error} = SetWebInfo($Request->{Arg1},$WebInfo,$Verbose);
-        $WebInfo = GetWebInfo();
+        $Request->{Error} = SetGPIOInfo($Request->{Arg1},$GPIOInfo,$Verbose);
+        $GPIOInfo = GetGPIOInfo();
         }
 
     #
@@ -285,7 +336,7 @@ sub WebRequest {
     #
     # SetGPIO - Set value of GPIO output to specified arg
     #
-    elsif( $Request->{Type} eq "ToggleGPIO" ) {
+    elsif( $Request->{Type} eq "SetGPIO" ) {
         Message("**** GPIOServer: SetGPIO($Request->{Arg1},$Request->{Arg2})")
             if $Verbose;
         $Request->{Error} = SetGPIO($Request->{Arg1},$Request->{Arg2});
@@ -312,13 +363,14 @@ sub WebRequest {
     else {
         Message("**** GPIOServer: ConfigServer: Unknown request type ($Request->{Type})")
             if $Verbose;
+        $Request->{Error} = "**** GPIOServer: ConfigServer: Unknown request type ($Request->{Type})";
         }
 
     #
     # Pack up the error message and return the struct to the caller
     #
     GetGPIOValues();
-    $Request->{State} = $WebInfo;
+    $Request->{State} = $GPIOInfo;
     SendResponse($Conn,$Request);
     }
 
@@ -330,7 +382,7 @@ sub WebRequest {
 #
 # Inputs:      None.
 #
-# Outputs:     GPIO info struct
+# Outputs:     None. Global $GPIOConfig is filled
 #
 sub GetGPIOConfig {
 
@@ -342,9 +394,9 @@ sub GetGPIOConfig {
         unless -r $GPIOConfigFile;
 
     my $ConfigFile = Site::ParseData->new(Filename => $GPIOConfigFile, Matches  => $GPIOMatches);
-    my $GPIOConfig = $ConfigFile->ParseFile();
+    $GPIOConfig = $ConfigFile->ParseFile();
 
-    $GPIOConfig->{$RenameKey} = MatchArgs($GPIOConfig->{$RenameKey}, "Yes","No","Global",$RenameKey);
+    $GPIOConfig->{$RenameKey} = MatchArgs($GPIOConfig->{$RenameKey}, [ "Yes", "No" ],"Global",$RenameKey);
     $GPIOConfig->{Valid} = $ConfigFile->{Parsed};
 
     foreach my $GPIOID (keys %{$GPIOConfig}) {
@@ -373,21 +425,15 @@ sub GetGPIOConfig {
 
         my $GPIO = $GPIOConfig->{$GPIOID};
 
-        $GPIO->{ Mode} = MatchArgs($GPIO->{ Mode}, "Input","Output",$GPIOID, "Mode");
-        $GPIO->{Logic} = MatchArgs($GPIO->{Logic},"Normal","Invert",$GPIOID,"Logic");
-        $GPIO->{ Boot} = MatchArgs($GPIO->{ Boot},   "Off",    "On",$GPIOID, "Boot");
+        $GPIO->{ Mode} = MatchArgs($GPIO->{ Mode},[  "Input", "Output" ],$GPIOID, "Mode");
+        $GPIO->{Logic} = MatchArgs($GPIO->{Logic},[ "Normal", "Invert" ],$GPIOID,"Logic");
+        $GPIO->{ Boot} = MatchArgs($GPIO->{ Boot},[    "Off",     "On" ],$GPIOID, "Boot");
 
         #
-        # Pull takes "High", "Low", or "None".
+        # Pull takes "High", "Low", or "None". Devault (1st arg) is "None".
         #
-        if( $GPIO->{Mode} eq "Input" ) {
-
-            $GPIO->{Pull} = "None"
-                unless defined $GPIO->{Pull} and length $GPIO->{Pull};
-
-            if( $GPIO->{Pull} =~ /None/i ) { $GPIO->{Pull} = "None"; }
-            else { $GPIO->{Pull} = MatchArgs($GPIO->{Pull},  "High",   "Low",$GPIOID, "Pull"); }
-            }
+        $GPIO->{Pull} = MatchArgs($GPIO->{Pull},[  "None", "Low", "High" ],$GPIOID, "Pull")
+            if $GPIO->{Mode} eq "Input";
 
         $GPIO->{HName} = "GPIO$GPIOID"
             unless defined $GPIO->{HName} and length $GPIO->{HName};
@@ -403,8 +449,7 @@ sub GetGPIOConfig {
         # Connect to the GPIO in question and get the current value
         #
         my $Device = RPi::Pin->new($GPIOID);
-
-Message("**** GPIOServer: Fix the boot setting!!!");
+        $GPIO->{Device} = $Device;
 
         if( $GPIO->{Mode} eq "Input" ) { 
             $Device->mode(INPUT); 
@@ -413,7 +458,7 @@ Message("**** GPIOServer: Fix the boot setting!!!");
             elsif( $GPIO->{Pull} eq "Low"  ) { $Device->pull(PUD_DOWN); }
             else                             { $Device->pull(PUD_OFF) ; }
 
-            $Device->set_interrupt(EDGE_BOTH,\&main::PinChange);
+            $Device->set_interrupt(EDGE_BOTH,'main::PinChange');
             }
         else                           { 
             #
@@ -424,27 +469,22 @@ Message("**** GPIOServer: Fix the boot setting!!!");
             $Device->mode(OUTPUT); 
             SetGPIO($GPIOID,$GPIO->{Boot});
             }
-
-        $GPIO->{Device} = $Device;
-        $GPIO->{ Value} = $Device->read();
         }
-
-    return $GPIOConfig;
     }
 
 
 ########################################################################################################################
 ########################################################################################################################
 #
-# GetWebInfo - Get an abbreviated struct for the Web interface
+# GetGPIOInfo - Get an abbreviated struct for the Web interface
 #
 # Inputs:      None.
 #
-# Outputs:     WebInfo struct
+# Outputs:     GPIOInfo struct
 #
-sub GetWebInfo {
+sub GetGPIOInfo {
 
-    my $WebInfo = { $RenameKey => $GPIOConfig->{$RenameKey} // "Yes", GPIOInfo => [] };
+    my $GPIOInfo = { $RenameKey => $GPIOConfig->{$RenameKey} // "Yes", GPIOInfo => [] };
 
     foreach my $GPIOID (keys %{$GPIOConfig}) {
 
@@ -453,17 +493,18 @@ sub GetWebInfo {
 
         my $GPIO = $GPIOConfig->{$GPIOID};
 
-        push @{$WebInfo->{GPIOInfo}},{ UName  => $GPIO->{ UName}, 
-                                       UDesc  => $GPIO->{ UDesc}, 
-                                       HName  => $GPIO->{ HName}, 
-                                       Mode   => $GPIO->{  Mode},
-                                       Invert => $GPIO->{Invert},
-                                       ID     => $GPIOID };
+        push @{$GPIOInfo->{GPIOInfo}},{ UName  => $GPIO->{ UName}, 
+                                        UDesc  => $GPIO->{ UDesc}, 
+                                        HName  => $GPIO->{ HName}, 
+                                        Mode   => $GPIO->{  Mode},
+                                        ID     => $GPIOID };
         }
 
-    $WebInfo->{SysName} = $SysName;
+    $GPIOInfo->{SysName} = $SysName;
 
-    return $WebInfo;
+    $GPIOInfo->{GPIOInfo} = [ sort { $a->{ID} <=> $b->{ID} } @{$GPIOInfo->{GPIOInfo}} ];
+
+    return $GPIOInfo;
     }
 
 
@@ -474,14 +515,14 @@ sub GetWebInfo {
 #
 # Inputs:      None.
 #
-# Outputs:     None. Values are set in place at $WebInfo->{GPIOInfo}
+# Outputs:     None. Values are set in place at $GPIOInfo->{GPIOInfo}
 #
 sub GetGPIOValues {
 
     #
     # Run through the existing GPIO list, getting current values
     #
-    foreach my $GPIO (@{$WebInfo->{GPIOInfo}}) {
+    foreach my $GPIO (@{$GPIOInfo->{GPIOInfo}}) {
         my $Value = $GPIOConfig->{$GPIO->{ID}}->{Device}->read();
 
         $Value = 1 - $Value
@@ -581,7 +622,7 @@ sub SetGPIO {
 ########################################################################################################################
 ########################################################################################################################
 #
-# SetWebInfo - Set a new GPIO config
+# SetGPIOInfo - Set a new GPIO config
 #
 # Inputs:      Requested config state
 #              Original  config state (for comparison)
@@ -589,19 +630,19 @@ sub SetGPIO {
 #
 # Outputs:     None
 #
-sub SetWebInfo {
+sub SetGPIOInfo {
     my $NewInfo  = shift;
     my $OrigInfo = shift;
     my $Verbose  = shift;
 
-    my $WebInfo = {};
+    my $GPIOInfo = {};
 
     foreach my $GPIO (@{$NewInfo->{GPIOInfo}}) {
-        $WebInfo->{$GPIO->{ID}}->{UName} = $GPIO->{UName};
-        $WebInfo->{$GPIO->{ID}}->{UDesc} = $GPIO->{UDesc};
+        $GPIOInfo->{$GPIO->{ID}}->{UName} = $GPIO->{UName};
+        $GPIOInfo->{$GPIO->{ID}}->{UDesc} = $GPIO->{UDesc};
         }
 
-# print Data::Dumper->Dump([$WebInfo],["WebInfo"])
+# print Data::Dumper->Dump([$GPIOInfo],["GPIOInfo"])
 
     #
     # If the original file did not exist, create an empty one.
@@ -619,7 +660,7 @@ sub SetWebInfo {
     my $ConfigFile = Site::ParseData->new(Filename => $GPIOConfigFile, Matches  => $GPIOMatches);
     my $GPIOConfig = $ConfigFile->ParseFile();
 
-    $ConfigFile->FromHash($WebInfo);
+    $ConfigFile->FromHash($GPIOInfo);
     $ConfigFile->Update();
     $ConfigFile->SaveFile();
 
@@ -635,9 +676,8 @@ sub SetWebInfo {
 #
 # MatchArgs - Match a GPIO description with one (of two) arguments
 #
-# Inputs:      Argument to match        (ex: "Mode")
-#              First possible match     (ex: "Input")
-#              TRUE if verbose mode     (ex: "Output")
+# Inputs:      Argument to match                (ex: "Mode")
+#              Array of possible args to match  (ex: [ "High", "Low" ] )
 #              GPIO ID this arg applies to         (for error message)
 #              Argument name this match applies to (for error message)
 #
@@ -647,17 +687,20 @@ sub SetWebInfo {
 #
 sub MatchArgs {
     my $Arg     = shift;
-    my $Match1  = shift;
-    my $Match2  = shift;
+    my $Matches = shift;
     my $GPIOID  = shift;
     my $ArgName = shift;
 
-    $Arg = $Match1
+    #
+    # If $Arg unspecified, take 1st match as default.
+    #
+    return $Matches->[0]
         unless defined $Arg and length $Arg;
 
-    if   ( $Arg =~ /$Match1/i ) { $Arg = $Match1; }
-    elsif( $Arg =~ /$Match2/i ) { $Arg = $Match2; }
-    else { exit Message("**** GPIOServer: GPIO ID ($GPIOID) $ArgName is not '$Match1' or '$Match2'"); }
+    foreach my $Match (@{$Matches}) {
+        return $Match
+            if $Arg =~ /$Match/i;
+        }
 
-    return $Arg;
+    exit Message("**** GPIOServer: GPIO ID ($GPIOID) $Arg is not a valid setting for $ArgName.");
     }

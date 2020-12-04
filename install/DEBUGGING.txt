@@ -1,9 +1,21 @@
 ########################################################################################################################
 #
-# The system uses the WiringPi numbering scheme for GPIOs
+# The GPIOTest program (included in this directory) uses the same GPIO logic as GPIOServer, but
+#   without other actions.
 #
-# The following table outlines the COMPLETELY FRUSTRATING numbering schemes used on
-#   the RasPi. Use the wPi column numbering for the command GPIO numbers.
+# Use it to verify your hardware settings before modifying /etc/rc.local. For example, the
+#   following will flash GPIO 19 (as an LED) and read GPIO 4 and print the value
+#
+./GPIOTest --flash-gpio=19 --read-gpio=4
+
+########################################################################################################################
+#
+# I have no earthly idea which GPIO numbering is used on your system, and I suspect
+#   it changes with different versions of RasPi and the phase of the moon.
+#
+# The following table outlines the numbering schemes used on the RasPi. Figure out
+#   which one is used on your system using the GPIOTest command, and those same
+#   numbers will work with the GPIOServer.
 #
  +-----+-----+---------+------+---+---Pi 4B--+---+------+---------+-----+-----+
  | BCM | wPi |   Name  | Mode | V | Physical | V | Mode | Name    | wPi | BCM |
@@ -38,6 +50,6 @@
 # If a remote user is logged into the system via ssh, the AppDaemon will not reboot the system
 #   when the application ends (on the assumption that a remote user is debugging the system).
 #
-# Thus, if you need to debug the server for any reason, it's sufficient to remote login using ssh,
+# Thus, if you need to debug the GPIOServer, it's sufficient to remote login using ssh,
 #   kill the GPIOServer process, and rerun it manually from the command line.
 #
