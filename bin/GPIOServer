@@ -32,11 +32,16 @@
 ##      CycleGPIO   GPIO#   => Turn one GPIO off, wait, then turn ON again
 ##      ReadGPIO            => Read all GPIO values (synonym for GetGPIOInfo)
 ##
+##      SetUName    GPIO# Name        => Set UName of GPIO
+##      SetUDesc    GPIO# Desc        => Set UDesc of GPIO
+##
 ##      Examples:
 ##
-##          ToggleGPIO 7        Change state of GPIO 7: if Off, becomes On. If On, becomes Off
+##          ToggleGPIO 7            Change state of GPIO 7: if Off, becomes On. If On, becomes Off
 ##
-##          CucleGPIO  10       Will turn 10 Off, wait a while, then on again
+##          CycleGPIO  10           Will turn 10 Off, wait a while, then on again
+##
+##          SetUName   7 "Keurig"   Change UName of GPIO7 to "Keurig"
 ##
 ########################################################################################################################
 ########################################################################################################################
@@ -157,9 +162,9 @@ our $GPIOMatches = [
     { Name => "Logic"   , RegEx => qr/^\s*Logic\s*=\s*(\w+)/i   ,Action => Site::ParseData::AddVar      },
     { Name => "Pull"    , RegEx => qr/^\s*Pull\s*=\s*(\w+)/i    ,Action => Site::ParseData::AddVar      },
     { Name => "Boot"    , RegEx => qr/^\s*Boot\s*=\s*(\w+)/i    ,Action => Site::ParseData::AddVar      },
-    { Name => "HName"   , RegEx => qr/^\s*HName\s*=\s*"(.*)"/i  ,Action => Site::ParseData::AddVar      },
-    { Name => "UName"   , RegEx => qr/^\s*UName\s*=\s*"(.*)"/i  ,Action => Site::ParseData::AddVar      },
-    { Name => "UDesc"   , RegEx => qr/^\s*UDesc\s*=\s*"(.*)"/i  ,Action => Site::ParseData::AddVar      },
+    { Name => "HName"   , RegEx => qr/^\s*HName\s*=\s*(".*")/i  ,Action => Site::ParseData::AddQVar     },
+    { Name => "UName"   , RegEx => qr/^\s*UName\s*=\s*(".*")/i  ,Action => Site::ParseData::AddQVar     },
+    { Name => "UDesc"   , RegEx => qr/^\s*UDesc\s*=\s*(".*")/i  ,Action => Site::ParseData::AddQVar     },
     ];
 
 ########################################################################################################################
@@ -225,6 +230,25 @@ sub ConnectionRequest {
 ########################################################################################################################
 ########################################################################################################################
 #
+# UpdateClients - Updat all existing clients with new information
+#
+# Inputs:      Error message to send
+#
+# Outputs:     None. Connected clients are sent a new GPIOInfo struct
+#
+sub UpdateClients {
+
+    my $Server  = GetServer();
+    my $Request = { Type => "GetGPIOInfo", State => $GPIOInfo, Error => $NoError };
+
+    SendResponse($_,$Request)
+        for $Server->connections();
+    }
+
+
+########################################################################################################################
+########################################################################################################################
+#
 # PinChange - Handle pin change notifications
 #
 # Inputs:      None.
@@ -235,13 +259,7 @@ sub PinChange {
 
     Message("**** GPIOServer: PinChange!");
 
-    GetGPIOValues();
-    my $Request = { Type => "GetGPIOInfo", State => $GPIOInfo, Error => $NoError };
-
-    my $Server = GetServer();
-
-    SendResponse($_,$Request)
-        for $Server->connections();
+    GetGPIOValues();        # Will update all clients
     }
 
 
@@ -355,6 +373,26 @@ sub WebRequest {
             sleep $CycleMS/1000.0;
             $Request->{Error} = SetGPIO($Request->{Arg1},"On");
             }
+        }
+
+    #
+    # SetUName - Set UName of GPIO to specified arg
+    #
+    elsif( $Request->{Type} eq "SetUName" ) {
+        Message("**** GPIOServer: SetUName($Request->{Arg1},$Request->{Arg2})")
+            if $Verbose;
+
+        $Request->{Error} = SetUName($Request->{Arg1},$Request->{Arg2},$Verbose);
+        }
+
+    #
+    # SetUDesc - Set UDesc of GPIO to specified arg
+    #
+    elsif( $Request->{Type} eq "SetUDesc" ) {
+        Message("**** GPIOServer: SetUDesc($Request->{Arg1},$Request->{Arg2})")
+            if $Verbose;
+
+        $Request->{Error} = SetUDesc($Request->{Arg1},$Request->{Arg2},$Verbose);
         }
 
     #
@@ -565,9 +603,10 @@ sub ToggleGPIO {
 #
 # SetGPIO - Set value of GPIO
 #
-# Inputs:      ID of GPIO to toggle
+# Inputs:       ID of GPIO to toggle
+#               New Value to set
 #
-# Outputs:     Error msg, or $NoError
+# Outputs:      Error msg, or $NoError
 #
 # IMPORTANT: "On" and "Off" mean different things depending on the "Logic" setting, "High", "Low", and other
 #              explicit settings do not. If you set the output "High" the output is high, if you set the output
@@ -580,9 +619,9 @@ sub SetGPIO {
     my $GPIO = $GPIOConfig->{$GPIOID};
 
     unless( defined($GPIO) ) {
-        Message("**** GPIOServer: Not configured for user control ($GPIOID)")
+        Message("**** GPIOServer: Server does not control GPIO ($GPIOID)")
             if $Verbose;
-        return "Not configured for user control ($GPIOID)";
+        return "Server does not control GPIO ($GPIOID)";
         }
 
     if( $GPIO->{Mode} ne "Output" ) {
@@ -622,24 +661,97 @@ sub SetGPIO {
 ########################################################################################################################
 ########################################################################################################################
 #
+# SetUName - Set UName of GPIO
+#
+# Inputs:      ID of GPIO to toggle
+#              New UName to use
+#              TRUE if verbose mode
+#
+# Outputs:     Error msg, or $NoError
+#
+sub SetUName {
+    my $GPIOID  = shift;
+    my $UName   = shift;
+    my $Verbose = shift;
+
+    if( $GPIOInfo->{$RenameKey} ne "Yes" ) {
+        Message("**** GPIOServer: Renaming disallowed.")
+            if $Verbose;
+        return "Renaming disallowed";
+        }
+
+    my $GPIO = (grep { $_->{ID} eq $GPIOID } @{$GPIOInfo->{GPIOInfo}})[0];
+
+    unless( defined($GPIO) ) {
+        Message("**** GPIOServer: Server does not control GPIO ($GPIOID)")
+            if $Verbose;
+        return "Server does not control GPIO ($GPIOID)";
+        }
+
+    $GPIO->{UName} = $UName;
+
+    return SetGPIOInfo($GPIOInfo,$Verbose);
+    }
+    
+
+########################################################################################################################
+########################################################################################################################
+#
+# SetUDesc - Set UDesc of GPIO
+#
+# Inputs:      ID of GPIO to toggle
+#              New UDesc to use
+#              TRUE if verbose mode
+#
+# Outputs:     Error msg, or $NoError
+#
+sub SetUDesc {
+    my $GPIOID  = shift;
+    my $UDesc   = shift;
+    my $Verbose = shift;
+
+    if( $GPIOInfo->{$RenameKey} ne "Yes" ) {
+        Message("**** GPIOServer: Renaming disallowed.")
+            if $Verbose;
+        return "Renaming disallowed";
+        }
+
+    my $GPIO = (grep { $_->{ID} eq $GPIOID } @{$GPIOInfo->{GPIOInfo}})[0];
+
+    unless( defined($GPIO) ) {
+        Message("**** GPIOServer: Server does not control GPIO ($GPIOID)")
+            if $Verbose;
+        return "Server does not control GPIO ($GPIOID)";
+        }
+
+    $GPIO->{UDesc} = $UDesc;
+
+    return SetGPIOInfo($GPIOInfo,$Verbose);
+    }
+    
+
+########################################################################################################################
+########################################################################################################################
+#
 # SetGPIOInfo - Set a new GPIO config
 #
 # Inputs:      Requested config state
 #              Original  config state (for comparison)
 #              TRUE if verbose mode
 #
-# Outputs:     None
+# Outputs:     Error message
 #
 sub SetGPIOInfo {
-    my $NewInfo  = shift;
-    my $OrigInfo = shift;
-    my $Verbose  = shift;
+    my $NewInfo = shift;
+    my $Verbose = shift;
 
     my $GPIOInfo = {};
 
     foreach my $GPIO (@{$NewInfo->{GPIOInfo}}) {
         $GPIOInfo->{$GPIO->{ID}}->{UName} = $GPIO->{UName};
         $GPIOInfo->{$GPIO->{ID}}->{UDesc} = $GPIO->{UDesc};
+        $GPIOConfig->{$GPIO->{ID}}->{UName} = $GPIO->{UName};
+        $GPIOConfig->{$GPIO->{ID}}->{UDesc} = $GPIO->{UDesc};
         }
 
 # print Data::Dumper->Dump([$GPIOInfo],["GPIOInfo"])

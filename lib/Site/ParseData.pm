@@ -28,6 +28,7 @@
 ##                      ->{Value}       Value of variable
 ##                      ->{LineNo}      Line # where value was found
 ##                      ->{NewValue}    New value to set during update call
+##                      ->{Mode}        "Normal", or "Quoted" for quoted string matches
 ##
 ##
 ##  FUNCTIONS
@@ -119,6 +120,7 @@ use constant EndSection     => 1;
 use constant AddVar         => 2;
 use constant AddGlobal      => 3;
 use constant SkipLine       => 4;
+use constant AddQVar        => 5;
 
 use constant CommentHash    => 1;       # Commented by prepending hash
 use constant CommentSemi    => 2;       # Commented by prepending semicolon
@@ -315,12 +317,24 @@ sub Parse {
                 }
 
             elsif( $Match->{Action} == AddVar ) {
-                $CurrentSection->{Vars}{$Name} = { Value => $Var1, LineNo => $LineNo };
+                $CurrentSection->{Vars}{$Name} = { Value => $Var1, LineNo => $LineNo, Mode => "Normal" };
                 next;
                 }
 
+            #
+            # AddQVar - Add quoted var, remove the quotes
+            #
+            elsif( $Match->{Action} == AddQVar ) {
+                die "ParseData: $Name field is not quoted ($Var1)"
+                    if substr($Var1,0,1) ne '"' or substr($Var1,-1) ne '"';
+                $Var1 = substr($Var1,1,-1);                                     # Remove 1st/last chars
+                $CurrentSection->{Vars}{$Name} = { Value => $Var1, LineNo => $LineNo, Mode => "Quoted" };
+                next;
+                }
+
+                
             else {
-                die "Config::Parse: Unknown parse action ($Match->{Action})";
+                die "ParseData: Unknown parse action ($Match->{Action})";
                 }
             }
         }
@@ -483,8 +497,14 @@ sub Update {
             # If the original value was blank, a simple substitution won't work. In that case, append the new
             #   value to the end of the line
             #
-            if( $Var->{Value} eq "" ) { $self->{Lines}[$Var->{LineNo}] .= $Var->{NewValue};                           }
-            else                      { $self->{Lines}[$Var->{LineNo}] =~ s/\Q$Var->{Value}\E/\Q$Var->{NewValue}\E/g; }
+            # Quoted values were introduced to fix this. If the value was quoted on input, quotes were removed so
+            #   replace them now.
+            #
+            if(    $Var->{Mode} eq "Normal" ) {
+                if( $Var->{Value} eq "" ) { $self->{Lines}[$Var->{LineNo}] .= $Var->{NewValue};                       }
+                else                      { $self->{Lines}[$Var->{LineNo}] =~ s/\Q$Var->{Value}\E/$Var->{NewValue}/g; }
+                }
+            elsif( $Var->{Mode} eq "Quoted" ) {$self->{Lines}[$Var->{LineNo}] =~ s/\"\Q$Var->{Value}\E\"/\"$Var->{NewValue}\"/g; }
 
             $self->{Changed} = 1;
             }

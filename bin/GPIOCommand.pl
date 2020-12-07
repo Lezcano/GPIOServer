@@ -38,17 +38,22 @@
 ##          SetGPIO     GPIO# Val   => Set    the state of one GPIO to specific value
 ##          ReadGPIO    GPIO#       => Read value of GPIO and print ("On" or "Off")
 ##
-##      GPIO#       Is the number of the GPIO, and will be in the range 0-31
+##          SetUName    GPIO# Name  => Set UName of GPIO
+##          SetUDesc    GPIO# Desc  => Set UDesc of GPIO
+##
+##      GPIO#       Is the number of the GPIO, in the range 0-31
 ##
 ##      Val         Is one of [ "On", "Off" ]
 ##
 ##  EXAMPLES
 ##
-##      GPIOCommand 192.168.1.31 ListCommands        # Return list of available commands
+##      GPIOCommand 192.168.1.31 ListCommands            # Return list of available commands
 ##
-##      GPIOCommand 192.168.1.31 ToggleGPIO 7        # Toggle value of GPIO 7
+##      GPIOCommand 192.168.1.31 ToggleGPIO 7            # Toggle value of GPIO 7
 ##
-##      GPIOCommand 192.168.1.31 SetGPIO    12 Off   # Set GPIO 12 to Off
+##      GPIOCommand 192.168.1.31 SetGPIO    12 Off      # Set GPIO 12 to Off
+##
+##      GPIOCommand 192.168.1.31 SetUName   7 "Keurig"  # Change UName of GPIO7 to "Keurig"
 ##
 ########################################################################################################################
 ########################################################################################################################
@@ -180,11 +185,18 @@ $Client = Net::Async::WebSocket::Client->new(
             exit 0;
             }
 
-        PrintGPIOInfo($Request->{State}{GPIOInfo})
-            if $Request->{Type} eq "GetGPIOInfo" or
-               $Request->{Type} eq "CycleGPIO"   or
-               $Request->{Type} eq "SetGPIO"     or
-               $Verbose;
+        if( $Request->{Type} eq "GetGPIOInfo" or $Verbose ) {
+            PrintGPIOInfo($Request->{State}{GPIOInfo});
+            exit 0;
+            }
+
+        exit 0
+            if grep { $Request->{Type} eq $_ } ('SetGPIOInfo',
+                                                'ToggleGPIO',
+                                                'CycleGPIO',
+                                                'SetGPIO',
+                                                'SetUName',
+                                                'SetUDesc');
 
         print $JSONText;
         die "**** GPIOServer: Unknown response type: ($Request->{Type})";
