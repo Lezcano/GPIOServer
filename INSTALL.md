@@ -54,11 +54,11 @@ Verify that the output contains nothing but a list of "newest version" messages.
 
 ### Step 4: Configure your GPIO hardware
 
-Edit the file "etc/GPIO.conf" to describe your specific GPIO hardware.
-The commentary at the top of that file is self-explanatory, and there are
+Edit the file "/home/pi/GPIOServer/etc/GPIO.conf" to describe your specific GPIO hardware.
+The commentary at the top of that file explains the format, and there are
 example configurations to help you get started.
 
-The GPIOs shown by the GPIOServer shouldt *NOT* include the ones used by the AppDaemon!
+The GPIOs shown by the GPIOServer should *NOT* include the ones used by the AppDaemon!
 
 For example, suppose your rc.local contains the following:
 
@@ -73,8 +73,8 @@ owns them.
 ### Step 5: Test your GPIO hardware
 
 The install directory contains a testing app that uses the same GPIO numbering logic
-as the GPIOServer. Execute that app with your GPIO settings and verify that the inputs
-can be read, the outputs can be controlled, and so on.
+as the GPIOServer. Execute that app with your GPIO settings and verify that inputs
+can be read, outputs can be controlled, and so on.
 
 For example, the following command will flash (blink on-and-off) GPIO19, and read
 (and print) the values of GPIO4:
@@ -143,7 +143,7 @@ that they control your hardware in the correct manner, and so on.
 For example, if your RasPi has IP address 192.168.1.31, enter "http://192.168.1.31/" into the address bar to
 see the GPIOServer pages.
 
-Use the command program to connect to the IP address of your raspberry pi and verify that it can control
+Use the command program "GPIOControl" to connect to the IP address of your raspberry pi and verify that it can control
 the GPIOs in your system. For example, if your RasPi has IP address 192.168.1.31, from a different RasPi
 enter something like the following:
 
