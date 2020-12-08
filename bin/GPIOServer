@@ -260,6 +260,7 @@ sub PinChange {
     Message("**** GPIOServer: PinChange!");
 
     GetGPIOValues();        # Will update all clients
+    UpdateClients();
     }
 
 
