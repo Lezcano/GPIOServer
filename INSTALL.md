@@ -148,7 +148,7 @@ the GPIOs in your system. For example, if your RasPi has IP address 192.168.1.31
 enter something like the following:
 
 ```
-> GPIOControl.pl --host=192.168.1.31 ToggleGPIO 12
+> GPIOControl --host=192.168.1.31 ToggleGPIO 12
 ```
 
 Assuming GPIO 12 is configured as an output to your system, the toggle command should switch the
