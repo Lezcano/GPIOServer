@@ -42,9 +42,9 @@ For reference, here's an example GPIO configuration for the GPIO.conf file:
 
 </code></pre>
 
-## Porting GPIOControl.pl to other systems
+## Porting GPIOControl to other systems
 
-The program "GPIOServer/bin/GPIOControl.pl", is meant to be
+The program "GPIOServer/bin/GPIOControl", is meant to be
 compiled as a standalone executable for other architectures.
 
 To get a version compiled for a specific architecture, you will need to
@@ -59,7 +59,7 @@ guess as to how to compile the control program for those systems. If you run int
 problems, please sort it out and let me know so that I can update the
 documentation.</b>
 
-The following procedure can be used to compile the GPIOControl.pl into a
+The following procedure can be used to compile the GPIOControl into a
 Windows compatible executable:
 
 1) Install perl on the development Windows system
@@ -67,7 +67,7 @@ Windows compatible executable:
 3) Compile the executable:
 
 ```
-> pp -o GPIOControl GPIOControl.pl
+> pp -o GPIOControl.exe GPIOControl
 ```
 
 This will generate the command "GPIOControl.exe", compatible with

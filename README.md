@@ -1,5 +1,3 @@
-# IN DEVELOPMENT. Check back in about a week (Dec 7, 2020) for initial release (this line will be removed).
-
 # GPIOServer: Easy end-user control of RasPi hardware
 
 <table style="width: 100%;">
