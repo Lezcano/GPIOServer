@@ -103,7 +103,6 @@ export PERL_CANARY_STABILITY_NOPROMPT=1
 
 cpan IO::Async::Loop
 cpan Net::Async::WebSocket::Client.pm
-cpan PAR::Packer
 
 ########################################################################################################################
 #
